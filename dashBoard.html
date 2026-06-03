@@ -1,0 +1,76 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>DashBoard</title>
+    <link rel="stylesheet" href="css/dashBoard.css">
+</head>
+<body>
+    <header>Olá empreendedor!</header>
+    <p class="data"></p>
+    <section class="containerDashBoard">
+        <div class="resumosDoDia">
+            <p>Resumo do dia:</p>
+            <div class="faturamente">Faturamento</div>
+            <div class="espetos">Espetos</div>
+            <div class="lucro">Lucro</div>
+            <div class="estoque">Estoque</div>
+        </div>
+        <div id="estoqueCritico">
+            <p>Aqui vao estar todos os produtos com estoque muito baixo</p>
+        </div>
+    </section>
+
+    <section id="containerCadastro">
+        <label for="cadastro">Nome do Produto:</label>
+        <input type="text" name="produto" id="prod">
+        <label for="categoria">Categoria do produto:</label>
+        <input type="text" name="categoria" id="cat">
+        <label for="preco">Preço do produto:</label>
+        <input type="number" id="precoProduto">
+        <label for="estoqueInicial">Digite o estoque inicial:</label>
+        <input type="number" name="inicial" id="estoqueInicial">
+        <button>Cadastrar Produto</button>
+    </section>
+
+
+    <section id="containerEstoque">
+        <select name="nomeProduto" id="nomeProduto">
+            <option value="nomeProduto">Selecione o produto</option>
+        </select>
+        <label for="entradas">Entradas:</label>
+        <input type="number">
+
+        <button>Confirmar Entradas</button>
+
+    </section>
+
+    <section id="containerVendas">
+        <label for="produto">Produto:</label>
+        <select name="produto" id="produto">
+            <option value="produto">Selecione o produto</option>
+        </select>
+        <label for="quantidade">Quantidade:</label>
+        <input type="number" id="quantidade">
+        <button>Confirmar Venda</button>
+    </section>
+    
+    <section id="containerRelatorios">
+        <div class="diario">Diário</div>
+        <div class="semanal">Semanal</div>
+        <div class="mensal">Mensal</div>
+    </section>
+
+    <nav>
+        <button class="navDashBoard">1</button>
+        <button class ="navCadastrarProdutos">2</button>
+        <button class="navEstoque">3</button>
+        <button class="navVendas">4</button>
+        <button class="navRelatorios">5</button>
+        
+        
+    </nav>
+    
+</body>
+</html>
