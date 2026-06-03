@@ -1,0 +1,32 @@
+:root{
+   --preto:  #363537;
+   --laranja: #FF9B42;
+   --amarelo: #DCED31;
+}
+*{
+    padding: 0px;
+    margin: 0px;
+    box-sizing: border-box;
+}
+
+body{
+    background-color: #363537;
+}
+
+#form{
+    font-size: 2em;
+}
+
+#form label{
+    display: block;
+    text-align: center;
+    margin: 0 auto;
+}
+
+#form input{
+    display: block;
+    text-align: center;
+    margin: 0 auto;
+    width: 40%;
+    height: 40px;
+}
