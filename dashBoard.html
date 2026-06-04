@@ -13,13 +13,21 @@
         <div class="resumosDoDia">
             <p>Resumo do dia:</p>
             <div class="faturamente">Faturamento</div>
-            <div class="espetos">Espetos</div>
+            <div class="espetos">
+                Espetos<br>
+                <strong id="totalEspetosVendidos">0</strong>
+            </div>
             <div class="lucro">Lucro</div>
-            <div class="estoque">Estoque</div>
+            <div class="estoque">
+                Estoque Crítico<br>
+                <strong id="totalProdutosCriticos">0</strong>
+            </div>
         </div>
         <div id="estoqueCritico">
-            <p>Aqui vao estar todos os produtos com estoque muito baixo</p>
+            <p style="font-weight: bold; margin-bottom: 10px; color: #ff4444;">⚠️ Produtos com Estoque Baixo (Menos de 20 un):</p>
+            <div id="listaEstoqueCritico">
         </div>
+</div>
     </section>
 
     <section id="containerCadastro">
@@ -27,11 +35,13 @@
         <input type="text" name="produto" id="prod">
         <label for="categoria">Categoria do produto:</label>
         <input type="text" name="categoria" id="cat">
+        <label for="precoCusto">Preço de custo do produto:</label>
+        <input type="number" id="precoCusto" step="0.01">
         <label for="preco">Preço do produto:</label>
         <input type="number" id="precoProduto">
         <label for="estoqueInicial">Digite o estoque inicial:</label>
         <input type="number" name="inicial" id="estoqueInicial">
-        <button>Cadastrar Produto</button>
+        <button id="btnCadastrarProduto">Cadastrar Produto</button>
     </section>
 
 
@@ -40,9 +50,9 @@
             <option value="nomeProduto">Selecione o produto</option>
         </select>
         <label for="entradas">Entradas:</label>
-        <input type="number">
+        <input type="number" id="qtdEntrada">
 
-        <button>Confirmar Entradas</button>
+        <button id="btnConfirmarEntrada">Confirmar Entradas</button>
 
     </section>
 
@@ -53,14 +63,33 @@
         </select>
         <label for="quantidade">Quantidade:</label>
         <input type="number" id="quantidade">
-        <button>Confirmar Venda</button>
+        <button id="btnConfirmarVenda">Confirmar Venda</button>
     </section>
     
-    <section id="containerRelatorios">
-        <div class="diario">Diário</div>
-        <div class="semanal">Semanal</div>
-        <div class="mensal">Mensal</div>
-    </section>
+    <section id="containerRelatorios" style="display: block; padding: 20px;">
+    <div class="AbasRelatorioFiltragem">
+        <button id="btnRelatorioDiario" class="btn-filtro ativo">Diário</button>
+        <button id="btnRelatorioSemanal" class="btn-filtro">Semanal</button>
+        <button id="btnRelatorioMensal" class="btn-filtro">Mensal</button>
+    </div>
+
+    <div class="cards-resumo-relatorio">
+        <div class="card-relatorio faturamento-cor">
+            <span>Faturamento Acumulado</span>
+            <h2 id="faturamentoRelatorio">R$ 0,00</h2>
+        </div>
+        <div class="card-relatorio lucro-cor">
+            <span>Lucro Líquido Acumulado</span>
+            <h2 id="lucroRelatorio">R$ 0,00</h2>
+        </div>
+    </div>
+    <div class="listagem-vendas-container">
+        <h3>📋 Detalhamento das Vendas do Período</h3>
+        <div id="listaItensVendidos" class="lista-vendas-scroll">
+            <p class="feedback-relatorio">Clique em um dos períodos acima para carregar os dados.</p>
+        </div>
+    </div>
+</section>
 
     <nav>
         <button class="navDashBoard">1</button>
@@ -71,6 +100,6 @@
         
         
     </nav>
-    
+    <script type="module" src="server/dashBoard.js"></script>
 </body>
 </html>

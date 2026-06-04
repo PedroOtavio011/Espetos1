@@ -1,13 +1,13 @@
-css/* ==========================================================================
-   1. DEFINIÇÃO DA SUA PALETA DE CORES & RESETS
+/* ==========================================================================
+   1. RESETS E PALETA DE CORES
    ========================================================================== */
 :root {
-   --preto:   #212122;
-   --laranja: #FF9B42;
-   --amarelo: #DCED31;
-   --branco:  #FFFFFF;
-   --cinza-subtil: rgba(255, 255, 255, 0.08);
-   --vermelho-alerta: #FF4A4A;
+    --preto:           #212122;
+    --preto-card:      #2a2a2b;
+    --laranja:         #FF9B42;
+    --amarelo:         #DCED31;
+    --branco:          #FFFFFF;
+    --cinza-subtil:    rgba(255, 255, 255, 0.08);
 }
 
 * {
@@ -21,229 +21,95 @@ css/* ==========================================================================
 body {
     background-color: var(--preto);
     color: var(--branco);
-    /* Garante espaçamento da Dynamic Island e da barra de gestos do iPhone 15 */
-    padding: calc(24px + env(safe-area-inset-top)) 16px calc(110px + env(safe-area-inset-bottom)) 16px;
     min-height: 100vh;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    /* Adiciona margem segura nas laterais para telas de celular */
+    padding: 20px 24px; 
 }
 
 /* ==========================================================================
-   2. HEADER & TÍTULOS
+   2. CARD DE AUTENTICAÇÃO (MOBILE FIRST)
    ========================================================================== */
-header {
-    font-size: 1.8rem;
-    font-weight: 700;
+#form {
+    background: var(--preto-card);
+    width: 100%;
+    max-width: 420px; /* Limite confortável para o visual não esticar em tablets */
+    padding: 45px 28px;
+    border-radius: 24px;
+    border: 1px solid var(--cinza-subtil);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.4);
+    border-top: 5px solid var(--laranja); /* Linha do topo ligeiramente mais espessa */
+}
+
+/* Título marcante para o topo do formulário */
+#form::before {
+    content: "Acessar Sistema";
+    display: block;
+    font-size: 2.2rem; /* Fonte grande e visível no celular */
+    font-weight: 800;
     letter-spacing: -0.5px;
+    margin-bottom: 32px;
     color: var(--branco);
-}
-
-.data {
-    font-size: 0.85rem;
-    color: var(--laranja);
-    font-weight: 600;
-    margin-bottom: 24px;
-}
-
-section p:first-child {
-    font-weight: 600;
-    font-size: 1.1rem;
-    color: var(--branco);
-    margin-bottom: 16px;
+    text-align: center;
 }
 
 /* ==========================================================================
-   3. SEÇÕES GERAIS (CARDS DO APP)
-   ========================================================================== */
-section {
-    background: #2a2a2b; /* Um tom acima do fundo para dar profundidade */
-    border-radius: 16px;
-    padding: 20px;
-    margin-bottom: 16px;
-    border: 1px solid var(--cinza-subtil);
-}
-
-/* ==========================================================================
-   4. NOVO RESUMO DO DIA (GRID 2X2 ROBUSTO)
-   ========================================================================== */
-.containerDashBoard {
-    display: flex;
-    flex-direction: column;
-    gap: 16px;
-    background: transparent;
-    padding: 0;
-    border: none;
-}
-
-.resumosDoDia {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr); /* Alinhamento 2 por 2 perfeito */
-    gap: 16px; /* Espaço generoso entre os blocos */
-}
-
-/* Força o título "Resumo do dia:" a ocupar a largura total do topo do grid */
-.resumosDoDia p:first-child {
-    grid-column: span 2;
-    margin-bottom: 4px;
-}
-
-/* Cards Grandes de Métricas */
-.faturamente, .espetos, .lucro, .estoque {
-    background: #2a2a2b;
-    border: 1px solid var(--cinza-subtil);
-    border-radius: 16px;
-    padding: 24px 16px; /* Aumentado para dar espaço a muita informação */
-    min-height: 110px; /* Garante tamanho vertical generoso */
-    font-weight: 700;
-    font-size: 1.1rem;
-    color: var(--branco);
-    display: flex;
-    flex-direction: column;
-    justify-content: space-between;
-}
-
-/* Detalhes de cor específicos para cada métrica (UX Semântica) */
-.faturamente {
-    border-top: 4px solid var(--laranja);
-}
-.espetos {
-    border-top: 4px solid var(--amarelo);
-}
-.lucro {
-    border-top: 4px solid #34c759; /* Verde iOS para lucro */
-}
-.estoque {
-    border-top: 4px solid #5ac8fa; /* Azul iOS para controle de estoque */
-}
-
-/* Card de Alerta de Estoque Baixo */
-#estoqueCritico {
-    background-color: rgba(255, 74, 74, 0.1);
-    border: 1px solid var(--vermelho-alerta);
-    border-radius: 16px;
-    padding: 16px;
-}
-
-#estoqueCritico p {
-    color: var(--vermelho-alerta);
-    font-size: 0.95rem;
-    font-weight: 600;
-}
-
-/* ==========================================================================
-   5. COMPONENTES DE FORMULÁRIO
+   3. ELEMENTOS MAIORES PARA TOQUE (LABELS E INPUTS)
    ========================================================================== */
 label {
     display: block;
-    font-size: 0.85rem;
+    font-size: 1.1rem; /* Aumentado para facilitar a leitura rápida */
     color: var(--laranja);
-    margin-bottom: 6px;
-    margin-top: 14px;
-    font-weight: 600;
+    margin-bottom: 10px;
+    margin-top: 24px;
+    font-weight: 700;
+    text-transform: uppercase;
+    letter-spacing: 0.8px;
 }
 
-input, select {
+label[for="login"] {
+    margin-top: 0;
+}
+
+input {
     width: 100%;
-    padding: 14px;
-    border: 1px solid var(--cinza-subtil);
+    padding: 18px 16px; /* Área interna maior: muito mais fácil de tocar no celular */
+    border: 2px solid var(--cinza-subtil); /* Borda um pouco mais grossa */
     background-color: var(--preto);
-    border-radius: 12px;
+    border-radius: 14px;
     color: var(--branco);
-    font-size: 1rem;
+    font-size: 1.2rem; /* Fonte interna maior para o usuário enxergar bem o que digita */
+    transition: all 0.2s ease;
 }
 
-/* Seta estilizada para o select no fundo escuro */
-select {
-    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://w3.org' width='10' height='6' viewBox='0 0 10 6'><path fill='%23FF9B42' d='M0 0l5 5 5-5z'/></svg>");
-    background-repeat: no-repeat;
-    background-position: right 16px center;
-}
-
-input:focus, select:focus {
+input:focus {
     outline: none;
     border-color: var(--amarelo);
+    box-shadow: 0 0 0 4px rgba(220, 237, 49, 0.15);
 }
 
-/* Botões robustos para o polegar no celular */
-button {
+/* ==========================================================================
+   4. BOTÃO DE ACESSO COMPATÍVEL COM POLEGAR
+   ========================================================================== */
+#form button, button {
     width: 100%;
-    background-color: var(--laranja);
-    color: var(--preto);
+    background-color: var(--laranja) !important; /* Força a cor mesmo se houver conflito */
+    color: var(--preto) !important;
     border: none;
-    padding: 16px;
-    font-size: 1rem;
-    font-weight: 700;
-    border-radius: 12px;
-    margin-top: 20px;
-    transition: opacity 0.2s;
+    padding: 20px; /* Botão bem alto, ideal para cliques rápidos no celular */
+    font-size: 1.3rem; /* Texto do botão grande e em destaque */
+    font-weight: 800;
+    border-radius: 14px;
+    margin-top: 40px;
+    cursor: pointer;
+    box-shadow: 0 6px 20px rgba(255, 155, 66, 0.2);
+    transition: transform 0.1s ease, filter 0.2s ease;
 }
 
-button:active {
-    opacity: 0.8;
-}
-
-/* ==========================================================================
-   6. SEÇÃO DE RELATÓRIOS (CONTROLE EM ABAS ESCURAS)
-   ========================================================================== */
-#containerRelatorios {
-    display: flex;
-    background: var(--preto);
-    padding: 4px;
-    border-radius: 10px;
-    gap: 4px;
-    border: 1px solid var(--cinza-subtil);
-}
-
-.diario, .semanal, .mensal {
-    flex: 1;
-    background: transparent;
-    padding: 12px 8px;
-    font-size: 0.9rem;
-    border-radius: 8px;
-    font-weight: 600;
-    text-align: center;
-    color: var(--branco);
-    opacity: 0.6;
-}
-
-/* Item ativo simulado */
-.diario {
-    background: var(--laranja);
-    color: var(--preto);
-    opacity: 1;
-}
-
-/* ==========================================================================
-   7. TAB BAR INFERIOR (APPLE STYLE DARK)
-   ========================================================================== */
-nav {
-    position: fixed;
-    bottom: 0;
-    left: 0;
-    width: 100%;
-    background: rgba(33, 33, 34, 0.92); /* --preto com transparência */
-    backdrop-filter: blur(20px);
-    -webkit-backdrop-filter: blur(20px);
-    border-top: 1px solid var(--cinza-subtil);
-    display: flex;
-    justify-content: space-around;
-    padding-bottom: calc(10px + env(safe-area-inset-bottom)); 
-    padding-top: 10px;
-    z-index: 9999;
-}
-
-nav button {
-    background: transparent;
-    color: var(--branco);
-    opacity: 0.4;
-    font-size: 0.8rem;
-    font-weight: 600;
-    margin: 0;
-    padding: 6px 0;
-    border-radius: 0;
-    width: auto;
-}
-
-/* Item ativo no menu inferior */
-nav button.dashBoard {
-    color: var(--laranja);
-    opacity: 1;
+/* Efeito de clique físico no celular */
+#form button:active, button:active {
+    transform: scale(0.96); /* O botão "afunda" levemente ao ser pressionado */
+    filter: brightness(0.9);
 }
