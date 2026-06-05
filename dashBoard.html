@@ -7,9 +7,10 @@
     <link rel="stylesheet" href="css/dashBoard.css">
 </head>
 <body>
-    <header>Olá empreendedor!</header>
+    <header>Olá Empreendedor!</header>
     <p class="data"></p>
-    <section class="containerDashBoard">
+
+    <section id="containerdashboard">
         <div class="resumosDoDia">
             <p>Resumo do dia:</p>
             <div class="faturamente">Faturamento</div>
@@ -25,12 +26,12 @@
         </div>
         <div id="estoqueCritico">
             <p style="font-weight: bold; margin-bottom: 10px; color: #ff4444;">⚠️ Produtos com Estoque Baixo (Menos de 20 un):</p>
-            <div id="listaEstoqueCritico">
+            <div id="listaEstoqueCritico"></div>
         </div>
-</div>
     </section>
 
-    <section id="containerCadastro">
+    <section id="containercadastro">
+        <h2>Cadastro de Produtos</h2>
         <label for="cadastro">Nome do Produto:</label>
         <input type="text" name="produto" id="prod">
         <label for="categoria">Categoria do produto:</label>
@@ -44,19 +45,19 @@
         <button id="btnCadastrarProduto">Cadastrar Produto</button>
     </section>
 
-
-    <section id="containerEstoque">
+    <section id="containerestoque">
+        <h2>Gerenciamento de Estoque</h2>
+        <label for="nomeProduto">Produto:</label>
         <select name="nomeProduto" id="nomeProduto">
             <option value="nomeProduto">Selecione o produto</option>
         </select>
         <label for="entradas">Entradas:</label>
         <input type="number" id="qtdEntrada">
-
         <button id="btnConfirmarEntrada">Confirmar Entradas</button>
-
     </section>
 
-    <section id="containerVendas">
+    <section id="containervendas">
+        <h2>Registrar Venda</h2>
         <label for="produto">Produto:</label>
         <select name="produto" id="produto">
             <option value="produto">Selecione o produto</option>
@@ -66,40 +67,40 @@
         <button id="btnConfirmarVenda">Confirmar Venda</button>
     </section>
     
-    <section id="containerRelatorios" style="display: block; padding: 20px;">
-    <div class="AbasRelatorioFiltragem">
-        <button id="btnRelatorioDiario" class="btn-filtro ativo">Diário</button>
-        <button id="btnRelatorioSemanal" class="btn-filtro">Semanal</button>
-        <button id="btnRelatorioMensal" class="btn-filtro">Mensal</button>
-    </div>
+    <section id="containerrelatorios" style="padding: 20px;">
+        <h2>Relatórios de Vendas</h2>
+        <div class="AbasRelatorioFiltragem">
+            <button id="btnRelatorioDiario" class="btn-filtro ativo">Diário</button>
+            <button id="btnRelatorioSemanal" class="btn-filtro">Semanal</button>
+            <button id="btnRelatorioMensal" class="btn-filtro">Mensal</button>
+        </div>
 
-    <div class="cards-resumo-relatorio">
-        <div class="card-relatorio faturamento-cor">
-            <span>Faturamento Acumulado</span>
-            <h2 id="faturamentoRelatorio">R$ 0,00</h2>
+        <div class="cards-resumo-relatorio">
+            <div class="card-relatorio faturamento-cor">
+                <span>Faturamento Acumulado</span>
+                <h2 id="faturamentoRelatorio">R$ 0,00</h2>
+            </div>
+            <div class="card-relatorio lucro-cor">
+                <span>Lucro Líquido Acumulado</span>
+                <h2 id="lucroRelatorio">R$ 0,00</h2>
+            </div>
         </div>
-        <div class="card-relatorio lucro-cor">
-            <span>Lucro Líquido Acumulado</span>
-            <h2 id="lucroRelatorio">R$ 0,00</h2>
+        <div class="listagem-vendas-container">
+            <h3>📋 Detalhamento das Vendas do Período</h3>
+            <div id="listaItensVendidos" class="lista-vendas-scroll">
+                <p class="feedback-relatorio">Clique em um dos períodos acima para carregar os dados.</p>
+            </div>
         </div>
-    </div>
-    <div class="listagem-vendas-container">
-        <h3>📋 Detalhamento das Vendas do Período</h3>
-        <div id="listaItensVendidos" class="lista-vendas-scroll">
-            <p class="feedback-relatorio">Clique em um dos períodos acima para carregar os dados.</p>
-        </div>
-    </div>
-</section>
+    </section>
 
     <nav>
-        <button class="navDashBoard">1</button>
-        <button class ="navCadastrarProdutos">2</button>
-        <button class="navEstoque">3</button>
-        <button class="navVendas">4</button>
-        <button class="navRelatorios">5</button>
-        
-        
+        <button class="navDashBoard">📊 DASHBOARD</button>
+        <button class="navCadastrarProdutos">📦 CADASTRAR</button>
+        <button class="navEstoque">📝 ESTOQUE</button>
+        <button class="navVendas">💵 VENDAS</button>
+        <button class="navRelatorios">🗂️ RELATÓRIOS</button>
     </nav>
     <script type="module" src="server/dashBoard.js"></script>
+    <script type="module" src="server/navigation.js"></script>
 </body>
 </html>
