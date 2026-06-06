@@ -93,16 +93,24 @@ async function onScanSuccess(decodedText, decodedResult) {
     ultimoCodigoLido = decodedText;
     
     console.log(`█║▌ Código detectado com sucesso: ${decodedText}`);
-    vibrarOuBipar();
+    
+    // 1. CORREÇÃO DA VIBRAÇÃO: Protegida para nunca travar o código se o celular rejeitar
+    try {
+        if (navigator.vibrate) {
+            navigator.vibrate(100);
+        }
+    } catch (e) {
+        console.warn("Vibração não suportada pelo navegador.");
+    }
 
     try {
         const produtosRef = collection(db, "produtos");
+        // Verifica se a busca por qr_code bate com o texto lido
         const q = query(produtosRef, where("qr_code", "==", decodedText));
         const querySnapshot = await getDocs(q);
 
         if (querySnapshot.empty) {
-            console.warn(`⚠️ Produto com o código [${decodedText}] não está cadastrado.`);
-            alert(`Código [${decodedText}] não encontrado no sistema!`);
+            alert(`⚠️ Código [${decodedText}] não encontrado no Firebase! Verifique o cadastro do produto.`);
             return;
         }
 
@@ -110,19 +118,22 @@ async function onScanSuccess(decodedText, decodedResult) {
         const idProduto = docProduto.id;
         const dadosProduto = docProduto.data();
 
-        if (dadosProduto.estoque < 1) {
-            alert(`⚠️ Estoque esgotado para: ${dadosProduto.nome}`);
+        // Garante que o estoque é um número válido antes de checar
+        const estoqueAtual = Number(dadosProduto.estoque) || 0;
+        if (estoqueAtual < 1) {
+            alert(`⚠️ Estoque esgotado para: ${dadosProduto.nome || "Produto"}`);
             return;
         }
 
-        // Força a conversão correta de tipos para evitar rejeição do Firestore
+        // 2. CORREÇÃO DOS NÚMEROS: Garante que os valores vão limpos para o Firebase
         const precoVenda = Number(dadosProduto.preco_venda) || 0;
         const precoCusto = Number(dadosProduto.preco_custo) || 0;
-
         const faturamento = precoVenda;
         const lucro = faturamento - precoCusto;
+        const categoriaProduto = dadosProduto.categoria || "Geral";
+        const nomeProduto = dadosProduto.nome || "Produto Sem Nome";
 
-        console.log(`📤 Gravando venda automática de 1 unidade para: ${dadosProduto.nome}`);
+        console.log(`📤 Gravando venda automática de 1 unidade para: ${nomeProduto}`);
 
         // Salva venda mestre
         const novaVendaRef = await addDoc(collection(db, "vendas"), {
@@ -137,7 +148,7 @@ async function onScanSuccess(decodedText, decodedResult) {
             quantidade: 1,
             preco_venda_momento: precoVenda,
             preco_custo_momento: precoCusto,
-            categoria_momento: dadosProduto.categoria || "Geral"
+            categoria_momento: categoriaProduto
         });
 
         // Baixa no estoque
@@ -145,18 +156,18 @@ async function onScanSuccess(decodedText, decodedResult) {
             estoque: increment(-1)
         });
 
-        alert(`✅ Venda Concluída! 1x ${dadosProduto.nome}`);
+        // ESSE ALERT PRECISA APARECER SE TUDO DEU CERTO!
+        alert(`✅ VENDA CONCLUÍDA!\nProduto: ${nomeProduto}\nEstoque Atualizado!`);
         
-        // Dispara um evento global avisando o arquivo dashBoard.js para se atualizar sozinho no fundo
+        // Dispara o evento de atualização da tela
         document.dispatchEvent(new Event("vendaAtualizada"));
 
     } catch (error) {
-        console.error("Erro no processamento do fluxo da câmera:", error);
-        // ESSE ALERT VAI REVELAR O MOTIVO EXATO SE TRAVAR DE NOVO
-        alert("Erro no Firebase: " + error.message);
+        console.error("Erro fatal no fluxo do Firebase:", error);
+        // Se o Firebase rejeitar por falta de permissões ou regras, este alert VAI aparecer
+        alert("🚨 Erro Crítico no Firebase: " + error.message);
     }
 }
-
 function pararScanner() {
     console.log("🔌 [Scanner] Solicitando desligamento da câmera...");
 
