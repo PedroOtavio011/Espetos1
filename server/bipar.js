@@ -76,6 +76,7 @@ function iniciarScannerContinuo() {
 
 // 🎯 FUNÇÃO DE VENDA AUTOMÁTICA SEQUENCIAL
 async function onScanSuccess(decodedText, decodedResult) {
+    alert("A câmera conseguiu ler: " + decodedText);
     const agora = Date.now();
     
     // Filtro anti-duplicação (2 segundos de segurança para o mesmo código)
