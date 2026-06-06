@@ -57,15 +57,13 @@ function iniciarScannerContinuo() {
     btnCamera.style.background = "#ff4444";
     estaEscaneando = true;
 
-    // Inicializa o leitor apontando para a div do HTML (Biblioteca global carregada no head)
     html5QrcodeScanner = new Html5Qrcode("leitor-camera");
 
     html5QrcodeScanner.start(
         { facingMode: "environment" }, 
         {
-            fps: 15, // Aumentado para ler mais rápido por segundo
+            fps: 15, 
             qrbox: function(viewfinderWidth, viewfinderHeight) {
-                // Deixa a caixa de leitura bem maior (80% da área do visor)
                 const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
                 const qrboxSize = Math.floor(minEdge * 0.8); 
                 return { width: qrboxSize, height: qrboxSize };
@@ -84,7 +82,7 @@ async function onScanSuccess(decodedText, decodedResult) {
     alert("A câmera conseguiu ler: " + decodedText);
     const agora = Date.now();
     
-    // Filtro anti-duplicação (2 segundos de segurança para o mesmo código)
+    // Filtro anti-duplicação (2 segundos de segurança)
     if (decodedText === ultimoCodigoLido && (agora - ultimaLeituraTime) < 2000) {
         return; 
     }
@@ -94,18 +92,11 @@ async function onScanSuccess(decodedText, decodedResult) {
     
     console.log(`█║▌ Código detectado com sucesso: ${decodedText}`);
     
-    // 1. CORREÇÃO DA VIBRAÇÃO: Protegida para nunca travar o código se o celular rejeitar
-    try {
-        if (navigator.vibrate) {
-            navigator.vibrate(100);
-        }
-    } catch (e) {
-        console.warn("Vibração não suportada pelo navegador.");
-    }
+    // Chamar a função agora com segurança
+    vibrarOuBipar();
 
     try {
         const produtosRef = collection(db, "produtos");
-        // Verifica se a busca por qr_code bate com o texto lido
         const q = query(produtosRef, where("qr_code", "==", decodedText));
         const querySnapshot = await getDocs(q);
 
@@ -118,14 +109,12 @@ async function onScanSuccess(decodedText, decodedResult) {
         const idProduto = docProduto.id;
         const dadosProduto = docProduto.data();
 
-        // Garante que o estoque é um número válido antes de checar
         const estoqueAtual = Number(dadosProduto.estoque) || 0;
         if (estoqueAtual < 1) {
             alert(`⚠️ Estoque esgotado para: ${dadosProduto.nome || "Produto"}`);
             return;
         }
 
-        // 2. CORREÇÃO DOS NÚMEROS: Garante que os valores vão limpos para o Firebase
         const precoVenda = Number(dadosProduto.preco_venda) || 0;
         const precoCusto = Number(dadosProduto.preco_custo) || 0;
         const faturamento = precoVenda;
@@ -156,40 +145,46 @@ async function onScanSuccess(decodedText, decodedResult) {
             estoque: increment(-1)
         });
 
-        // ESSE ALERT PRECISA APARECER SE TUDO DEU CERTO!
         alert(`✅ VENDA CONCLUÍDA!\nProduto: ${nomeProduto}\nEstoque Atualizado!`);
         
-        // Dispara o evento de atualização da tela
         document.dispatchEvent(new Event("vendaAtualizada"));
 
     } catch (error) {
         console.error("Erro fatal no fluxo do Firebase:", error);
-        // Se o Firebase rejeitar por falta de permissões ou regras, este alert VAI aparecer
         alert("🚨 Erro Crítico no Firebase: " + error.message);
     }
 }
+
 function pararScanner() {
     console.log("🔌 [Scanner] Solicitando desligamento da câmera...");
 
-    // Forçamos a interface a resetar IMEDIATAMENTE para o usuário não achar que travou
     if (containerCamera) containerCamera.style.display = "none";
     if (btnCamera) {
         btnCamera.innerText = "📷 Ligar Scanner Contínuo";
-        btnCamera.style.background = ""; // Remove o vermelho e volta ao padrão do CSS
+        btnCamera.style.background = ""; 
     }
     estaEscaneando = false;
 
-    // Agora desligamos o hardware da câmera em segundo plano com segurança
     if (html5QrcodeScanner) {
         html5QrcodeScanner.stop()
             .then(() => {
-                console.log("✅ [Scanner] Câmera desligada e hardware liberado com sucesso.");
-                html5QrcodeScanner = null; // Limpa a instância da memória
+                console.log("✅ [Scanner] Câmera desligada com sucesso.");
+                html5QrcodeScanner = null; 
             })
             .catch(err => {
-                // Mesmo se o navegador der um aviso chato ao desligar, a interface já foi resetada!
-                console.warn("⚠️ [Scanner] Aviso capturado ao parar hardware da câmera (ignorado para o usuário):", err);
+                console.warn("⚠️ [Scanner] Aviso ao parar hardware da câmera:", err);
                 html5QrcodeScanner = null;
             });
+    }
+}
+
+// 🔊 FUNÇÃO ADICIONADA PARA EVITAR O TRAVAMENTO DO CÓDIGO
+function vibrarOuBipar() {
+    try {
+        if (navigator.vibrate) {
+            navigator.vibrate(100); // Dá uma tremidinha de confirmação no celular
+        }
+    } catch (e) {
+        console.warn("Vibração não suportada pelo navegador.");
     }
 }
