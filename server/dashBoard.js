@@ -361,7 +361,7 @@ if (btnConfirmarVenda) {
 }
 
 // ==========================================
-// 6. ABA DE RELATÓRIOS INTEGRADA (EM TELA)
+// 6. ABA DE RELATÓRIOS INTEGRADA (EM TELA) - REFATORADA (AGRUPADA)
 // ==========================================
 const txtFaturamentoRelatorio = document.getElementById("faturamentoRelatorio");
 const txtLucroRelatorio = document.getElementById("lucroRelatorio");
@@ -402,63 +402,78 @@ async function gerarRelatorioPorPeriodo(diasParaTratras, botaoAtivo) {
 
     let faturamentoAcumulado = 0;
     let lucroAcumulado = 0;
+    
+    // Lista temporária na memória para guardar todos os sub-itens antes do agrupamento
+    const todosOsItensBrutos = [];
 
-    if (listaItensVendidos) listaItensVendidos.innerHTML = "";
-    let houveVendas = false;
-
+    // Passo 1: Coleta dos dados transacionais do banco
     for (const docVenda of vendasSnapshot.docs) {
       const dadosVenda = docVenda.data();
 
       faturamentoAcumulado += dadosVenda.faturamento_total || 0;
       lucroAcumulado += dadosVenda.lucro_total || 0;
 
-      const dataHora = dadosVenda.criado_em
-        ? dadosVenda.criado_em
-            .toDate()
-            .toLocaleString("pt-BR", {
-              day: "2-digit",
-              month: "2-digit",
-              hour: "2-digit",
-              minute: "2-digit",
-            })
-        : "--/-- --:--";
-
       const itensSnapshot = await getDocs(
         collection(db, "vendas", docVenda.id, "itens"),
       );
 
       itensSnapshot.forEach((docItem) => {
-        const item = docItem.data();
-        houveVendas = true;
-
-        const faturamentoItem = item.preco_venda_momento * item.quantidade;
-        const lucroItem =
-          faturamentoItem - item.preco_custo_momento * item.quantidade;
-
-        if (listaItensVendidos) {
-          listaItensVendidos.innerHTML += `
-                        <div class="item-vendido-card" style="background: #2a2a2a; padding: 12px; margin-bottom: 10px; border-left: 4px solid #ff9800; border-radius: 6px; text-align: left;">
-                            <span style="font-size: 11px; color: #aaa; display:block; margin-bottom: 4px;">📅 ${dataHora}</span>
-                            <strong>${item.categoria_momento}</strong> — <strong>${item.quantidade}x</strong> un.<br>
-                            <span style="font-size: 13px; color: #2196f3;">Venda: R$ ${faturamentoItem.toFixed(2)}</span> | 
-                            <span style="font-size: 13px; color: #4caf50; font-weight: bold;">Lucro: R$ ${lucroItem.toFixed(2)}</span>
-                        </div>
-                    `;
-        }
+        todosOsItensBrutos.push(docItem.data());
       });
     }
+
+    // Passo 2: Aplicação do algoritmo de redução (Agrupamento por Categoria/Nome)
+    const itensAgrupados = todosOsItensBrutos.reduce((acumulador, itemAtual) => {
+      // Usamos a categoria ou o ID do produto como chave única do agrupamento
+      const chave = itemAtual.categoria_momento || "Geral";
+      const quantidadeItem = Number(itemAtual.quantidade) || 0;
+      const faturamentoItem = (Number(itemAtual.preco_venda_momento) || 0) * quantidadeItem;
+      const custoItem = (Number(itemAtual.preco_custo_momento) || 0) * quantidadeItem;
+      const lucroItem = faturamentoItem - custoItem;
+
+      if (!acumulador[chave]) {
+        acumulador[chave] = {
+          categoria: chave,
+          quantidade_total: 0,
+          faturamento_total: 0,
+          lucro_total: 0
+        };
+      }
+
+      acumulador[chave].quantidade_total += quantidadeItem;
+      acumulador[chave].faturamento_total += faturamentoItem;
+      acumulador[chave].lucro_total += lucroItem;
+
+      return acumulador;
+    }, {});
+
+    // Passo 3: Renderização controlada da Interface
+    if (listaItensVendidos) listaItensVendidos.innerHTML = "";
+    const listaFinalParaTela = Object.values(itensAgrupados);
+
+    listaFinalParaTela.forEach((item) => {
+      if (listaItensVendidos) {
+        listaItensVendidos.innerHTML += `
+          <div class="item-vendido-card" style="background: #2a2a2a; padding: 12px; margin-bottom: 10px; border-left: 4px solid #ff9800; border-radius: 6px; text-align: left;">
+              <strong>${item.categoria}</strong> — <strong style="color: #ff9800; font-size: 16px;">${item.quantidade_total}x</strong> un.<br>
+              <span style="font-size: 13px; color: #2196f3;">Venda: R$ ${item.faturamento_total.toFixed(2)}</span> | 
+              <span style="font-size: 13px; color: #4caf50; font-weight: bold;">Lucro: R$ ${item.lucro_total.toFixed(2)}</span>
+          </div>
+        `;
+      }
+    });
 
     if (txtFaturamentoRelatorio)
       txtFaturamentoRelatorio.innerText = `R$ ${faturamentoAcumulado.toFixed(2)}`;
     if (txtLucroRelatorio)
       txtLucroRelatorio.innerText = `R$ ${lucroAcumulado.toFixed(2)}`;
 
-    if (!houveVendas && listaItensVendidos) {
+    if (listaFinalParaTela.length === 0 && listaItensVendidos) {
       listaItensVendidos.innerHTML =
         "<p class='feedback-relatorio'>Nenhuma venda registrada neste período.</p>";
     }
     console.log(
-      "✅ [Relatório] Processamento e renderização do relatório concluídos.",
+      "✅ [Relatório] Processamento analítico e renderização agrupada concluídos.",
     );
   } catch (error) {
     console.error(
@@ -605,3 +620,124 @@ document.addEventListener("vendaAtualizada", () => {
     carregarResumosDoDia();
     verificarEstoqueCritico();
 });
+
+// ==========================================
+// 9. RECURSO: ALTERAÇÃO DE DADOS DE PRODUTOS (CRUD)
+// ==========================================
+const selectAlterar = document.getElementById("selectAlterarProduto");
+const editNome = document.getElementById("inputAlterarNome");
+const editCategoria = document.getElementById("inputAlterarCategoria");
+const editCusto = document.getElementById("inputAlterarCusto");
+const editVenda = document.getElementById("inputAlterarVenda");
+const editQrCode = document.getElementById("inputAlterarQrCode");
+const btnSalvarAlteracao = document.getElementById("btnSalvarAlteracaoProduto");
+
+// Dicionário local na memória para evitar fazer requisições repetidas ao Firestore
+let cacheProdutosLocal = {};
+
+// Interceptamos a sua função original para injetar a atualização deste novo select também
+const funcaoCarregarOriginal = carregarProdutosNosSelects;
+carregarProdutosNosSelects = async function() {
+    await funcaoCarregarOriginal(); // Executa o que já existia
+    
+    if (!selectAlterar) return;
+    console.log("📥 [CRUD] Atualizando o select de modificação de produtos...");
+    
+    try {
+        const querySnapshot = await getDocs(collection(db, "produtos"));
+        selectAlterar.innerHTML = '<option value="">-- Selecione um produto para editar --</option>';
+        cacheProdutosLocal = {}; // Reseta o cache anterior
+
+        querySnapshot.forEach((doc) => {
+            const produto = doc.data();
+            const id = doc.id;
+            
+            // Salva no cache local indexando pelo ID único
+            cacheProdutosLocal[id] = produto;
+            
+            selectAlterar.innerHTML += `<option value="${id}">${produto.nome}</option>`;
+        });
+        console.log("✅ [CRUD] Select de edição sincronizado com sucesso.");
+    } catch (error) {
+        console.error("❌ [CRUD] Falha ao sincronizar catálogo para edição:", error);
+    }
+};
+
+// Evento 1: Detecta seleção e preenche o formulário automaticamente
+if (selectAlterar) {
+    selectAlterar.addEventListener("change", (e) => {
+        const idSelecionado = e.target.value;
+        console.log(`🔍 [CRUD] Produto selecionado para edição ID: ${idSelecionado}`);
+        
+        if (!idSelecionado || !cacheProdutosLocal[idSelecionado]) {
+            // Limpa o formulário se desmarcar o select
+            if(editNome) editNome.value = "";
+            if(editCategoria) editCategoria.value = "";
+            if(editCusto) editCusto.value = "";
+            if(editVenda) editVenda.value = "";
+            if(editQrCode) editQrCode.value = "";
+            return;
+        }
+
+        const dadosProduto = cacheProdutosLocal[idSelecionado];
+        
+        // Aloca os dados atuais nos inputs correspondentes
+        if(editNome) editNome.value = dadosProduto.nome || "";
+        if(editCategoria) editCategoria.value = dadosProduto.categoria || "";
+        if(editCusto) editCusto.value = dadosProduto.preco_custo ?? "";
+        if(editVenda) editVenda.value = dadosProduto.preco_venda ?? "";
+        if(editQrCode) editQrCode.value = dadosProduto.qr_code || "";
+        console.log("📝 [CRUD] Inputs populados com dados atuais do Firestore.");
+    });
+}
+
+// Evento 2: Processa a alteração e atualiza o banco de dados
+if (btnSalvarAlteracao) {
+    btnSalvarAlteracao.addEventListener("click", async () => {
+        const idProduto = selectAlterar.value;
+        
+        if (!idProduto) {
+            alert("Por favor, selecione primeiro um produto na lista superior!");
+            return;
+        }
+
+        const novoNome = editNome.value.trim();
+        const novaCategoria = editCategoria.value.trim();
+        const novoCusto = parseFloat(editCusto.value);
+        const novoVenda = parseFloat(editVenda.value);
+        const novoQrCode = editQrCode.value.trim();
+
+        // Validação sanitária de tipos antes de subir pro banco
+        if (!novoNome || !novaCategoria || isNaN(novoCusto) || isNaN(novoVenda) || !novoQrCode) {
+            alert("Não são permitidos campos em branco ou valores numéricos inválidos!");
+            return;
+        }
+
+        console.log(`📤 [CRUD] Iniciando persistência de alteração para o documento: ${idProduto}`);
+        
+        try {
+            const produtoRef = doc(db, "produtos", idProduto);
+            
+            // Gravação direta das novas propriedades mantendo o estoque intacto
+            await updateDoc(produtoRef, {
+                nome: novoNome,
+                categoria: novaCategoria,
+                preco_custo: novoCusto,
+                preco_venda: novoVenda,
+                qr_code: novoQrCode
+            });
+
+            console.log(`✅ [CRUD] Documento ${idProduto} atualizado com sucesso no Firestore.`);
+            alert("Produto alterado com sucesso no sistema!");
+
+            // Atualiza globalmente todos os selects e resumos do painel automaticamente
+            carregarProdutosNosSelects();
+            carregarResumosDoDia();
+            verificarEstoqueCritico();
+
+        } catch (error) {
+            console.error("❌ [CRUD] Erro crítico ao salvar modificações do produto:", error);
+            alert("Erro de permissão ou rede ao atualizar o produto: " + error.message);
+        }
+    });
+}
