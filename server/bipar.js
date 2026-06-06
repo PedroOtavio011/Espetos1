@@ -115,9 +115,12 @@ async function onScanSuccess(decodedText, decodedResult) {
             return;
         }
 
-        const faturamento = dadosProduto.preco_venda * 1;
-        const custo = dadosProduto.preco_custo * 1;
-        const lucro = faturamento - custo;
+        // Força a conversão correta de tipos para evitar rejeição do Firestore
+        const precoVenda = Number(dadosProduto.preco_venda) || 0;
+        const precoCusto = Number(dadosProduto.preco_custo) || 0;
+
+        const faturamento = precoVenda;
+        const lucro = faturamento - precoCusto;
 
         console.log(`📤 Gravando venda automática de 1 unidade para: ${dadosProduto.nome}`);
 
@@ -132,9 +135,9 @@ async function onScanSuccess(decodedText, decodedResult) {
         await addDoc(collection(db, "vendas", novaVendaRef.id, "itens"), {
             produto_id: idProduto,
             quantidade: 1,
-            preco_venda_momento: dadosProduto.preco_venda,
-            preco_custo_momento: dadosProduto.preco_custo,
-            categoria_momento: dadosProduto.categoria
+            preco_venda_momento: precoVenda,
+            preco_custo_momento: precoCusto,
+            categoria_momento: dadosProduto.categoria || "Geral"
         });
 
         // Baixa no estoque
@@ -142,13 +145,15 @@ async function onScanSuccess(decodedText, decodedResult) {
             estoque: increment(-1)
         });
 
-        console.log(`✅ Venda concluída com sucesso: 1x ${dadosProduto.nome}!`);
+        alert(`✅ Venda Concluída! 1x ${dadosProduto.nome}`);
         
         // Dispara um evento global avisando o arquivo dashBoard.js para se atualizar sozinho no fundo
         document.dispatchEvent(new Event("vendaAtualizada"));
 
     } catch (error) {
         console.error("Erro no processamento do fluxo da câmera:", error);
+        // ESSE ALERT VAI REVELAR O MOTIVO EXATO SE TRAVAR DE NOVO
+        alert("Erro no Firebase: " + error.message);
     }
 }
 
