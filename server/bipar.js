@@ -63,8 +63,13 @@ function iniciarScannerContinuo() {
     html5QrcodeScanner.start(
         { facingMode: "environment" }, 
         {
-            fps: 10,                 
-            qrbox: { width: 250, height: 250 } 
+            fps: 15, // Aumentado para ler mais rápido por segundo
+            qrbox: function(viewfinderWidth, viewfinderHeight) {
+                // Deixa a caixa de leitura bem maior (80% da área do visor)
+                const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
+                const qrboxSize = Math.floor(minEdge * 0.8); 
+                return { width: qrboxSize, height: qrboxSize };
+            }
         },
         onScanSuccess 
     ).catch(err => {
