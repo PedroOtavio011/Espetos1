@@ -27,7 +27,6 @@ const firebaseConfig = {
 const app = initializeApp(firebaseConfig);
 const db = getFirestore(app);
 
-// Variáveis de controle do Scanner
 let html5QrcodeScanner = null;
 let estaEscaneando = false;
 let ultimaLeituraTime = 0;
@@ -47,18 +46,13 @@ if (btnCamera) {
 }
 
 function iniciarScannerContinuo() {
-    if (!containerCamera) {
-        console.error("❌ Elemento 'leitor-camera' não foi encontrado no HTML.");
-        return;
-    }
-    
+    if (!containerCamera) return;
     containerCamera.style.display = "block";
     btnCamera.innerText = "🛑 Desligar Scanner";
     btnCamera.style.background = "#ff4444";
     estaEscaneando = true;
 
     html5QrcodeScanner = new Html5Qrcode("leitor-camera");
-
     html5QrcodeScanner.start(
         { facingMode: "environment" }, 
         {
@@ -71,37 +65,43 @@ function iniciarScannerContinuo() {
         },
         onScanSuccess 
     ).catch(err => {
-        console.error("Erro ao iniciar a câmera: ", err);
-        alert("Não foi possível acessar a câmera do aparelho.");
+        alert("Erro Câmera HW: " + err.message);
         pararScanner();
     });
 }
 
-// 🎯 FUNÇÃO DE VENDA AUTOMÁTICA SEQUENCIAL
-async function onScanSuccess(decodedText, decodedResult) {
-    alert("A câmera conseguiu ler: " + decodedText);
+// Handler da biblioteca isolado para não engolir erros síncronos
+function onScanSuccess(decodedText, decodedResult) {
     const agora = Date.now();
-    
-    // Filtro anti-duplicação (2 segundos de segurança)
-    if (decodedText === ultimoCodigoLido && (agora - ultimaLeituraTime) < 2000) {
+    if (decodedText === ultimoCodigoLido && (agora - ultimaLeituraTime) < 2500) {
         return; 
     }
-
     ultimaLeituraTime = agora;
     ultimoCodigoLido = decodedText;
-    
-    console.log(`█║▌ Código detectado com sucesso: ${decodedText}`);
-    
-    // Chamar a função agora com segurança
-    vibrarOuBipar();
 
+    alert("Passo 1: Leitura detectada: " + decodedText);
+    
+    // Execução assíncrona desacoplada da biblioteca principal
+    processarTransacaoFirebase(decodedText).catch(fatalError => {
+        alert("Erro Crítico Inesperado: " + fatalError.message);
+    });
+}
+
+// Pipeline de persistência isolado
+async function processarTransacaoFirebase(codigoLido) {
+    alert("Passo 2: Iniciando busca no Firestore...");
+    
     try {
         const produtosRef = collection(db, "produtos");
-        const q = query(produtosRef, where("qr_code", "==", decodedText));
+        const q = query(produtosRef, where("qr_code", "==", codigoLido));
+        
+        // Se travar exatamente aqui, o problema é conexão de rede ou inicialização do db
         const querySnapshot = await getDocs(q);
+        
+        alert("Passo 3: Busca respondida. Documentos encontrados: " + querySnapshot.size);
 
         if (querySnapshot.empty) {
-            alert(`⚠️ Código [${decodedText}] não encontrado no Firebase! Verifique o cadastro do produto.`);
+            alert(`X: Código [${codigoLido}] inexistente na coleção 'produtos'.`);
             return;
         }
 
@@ -109,82 +109,49 @@ async function onScanSuccess(decodedText, decodedResult) {
         const idProduto = docProduto.id;
         const dadosProduto = docProduto.data();
 
-        const estoqueAtual = Number(dadosProduto.estoque) || 0;
-        if (estoqueAtual < 1) {
-            alert(`⚠️ Estoque esgotado para: ${dadosProduto.nome || "Produto"}`);
-            return;
-        }
+        alert(`Passo 4: Produto identificado (${dadosProduto.nome || "Sem nome"}). Processando gravação...`);
 
         const precoVenda = Number(dadosProduto.preco_venda) || 0;
         const precoCusto = Number(dadosProduto.preco_custo) || 0;
-        const faturamento = precoVenda;
-        const lucro = faturamento - precoCusto;
-        const categoriaProduto = dadosProduto.categoria || "Geral";
-        const nomeProduto = dadosProduto.nome || "Produto Sem Nome";
 
-        console.log(`📤 Gravando venda automática de 1 unidade para: ${nomeProduto}`);
-
-        // Salva venda mestre
+        // Operação Atômica de Venda Mestre
         const novaVendaRef = await addDoc(collection(db, "vendas"), {
-            faturamento_total: faturamento,
-            lucro_total: lucro,
+            faturamento_total: precoVenda,
+            lucro_total: (precoVenda - precoCusto),
             criado_em: serverTimestamp()
         });
 
-        // Vincula item
+        // Subcoleção Itens
         await addDoc(collection(db, "vendas", novaVendaRef.id, "itens"), {
             produto_id: idProduto,
             quantidade: 1,
             preco_venda_momento: precoVenda,
             preco_custo_momento: precoCusto,
-            categoria_momento: categoriaProduto
+            categoria_momento: dadosProduto.categoria || "Geral"
         });
 
-        // Baixa no estoque
+        // Atualização de Inventário
         await updateDoc(doc(db, "produtos", idProduto), {
             estoque: increment(-1)
         });
 
-        alert(`✅ VENDA CONCLUÍDA!\nProduto: ${nomeProduto}\nEstoque Atualizado!`);
-        
+        alert("Passo 5: Sucesso total no Firestore!");
         document.dispatchEvent(new Event("vendaAtualizada"));
 
-    } catch (error) {
-        console.error("Erro fatal no fluxo do Firebase:", error);
-        alert("🚨 Erro Crítico no Firebase: " + error.message);
+    } catch (dbError) {
+        // Captura rejeições de segurança, falta de index ou problemas de escrita
+        alert("🚨 FALHA FIRESTORE:\nNome: " + dbError.name + "\nMensagem: " + dbError.message);
     }
 }
 
 function pararScanner() {
-    console.log("🔌 [Scanner] Solicitando desligamento da câmera...");
-
     if (containerCamera) containerCamera.style.display = "none";
     if (btnCamera) {
         btnCamera.innerText = "📷 Ligar Scanner Contínuo";
         btnCamera.style.background = ""; 
     }
     estaEscaneando = false;
-
     if (html5QrcodeScanner) {
-        html5QrcodeScanner.stop()
-            .then(() => {
-                console.log("✅ [Scanner] Câmera desligada com sucesso.");
-                html5QrcodeScanner = null; 
-            })
-            .catch(err => {
-                console.warn("⚠️ [Scanner] Aviso ao parar hardware da câmera:", err);
-                html5QrcodeScanner = null;
-            });
-    }
-}
-
-// 🔊 FUNÇÃO ADICIONADA PARA EVITAR O TRAVAMENTO DO CÓDIGO
-function vibrarOuBipar() {
-    try {
-        if (navigator.vibrate) {
-            navigator.vibrate(100); // Dá uma tremidinha de confirmação no celular
-        }
-    } catch (e) {
-        console.warn("Vibração não suportada pelo navegador.");
+        html5QrcodeScanner.stop().finally(() => { html5QrcodeScanner = null; });
     }
 }
