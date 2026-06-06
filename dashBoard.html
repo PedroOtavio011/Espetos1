@@ -5,6 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>DashBoard</title>
     <link rel="stylesheet" href="css/dashBoard.css">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
 </head>
 <body>
     <header>Olá Empreendedor!</header>
@@ -42,6 +43,8 @@
         <input type="number" id="precoProduto">
         <label for="estoqueInicial">Digite o estoque inicial:</label>
         <input type="number" name="inicial" id="estoqueInicial">
+        <label for="qrCode">Código de Barras do Produto:</label>
+        <input type="text" name="qrCode" id="qrCode">
         <button id="btnCadastrarProduto">Cadastrar Produto</button>
     </section>
 
@@ -58,6 +61,8 @@
 
     <section id="containervendas">
         <h2>Registrar Venda</h2>
+        <button id="btnAlternarCamera" class="camera">📷 Ligar Scanner Contínuo</button>
+        <div id="leitor-camera" style="width: 100%; max-width: 400px; margin: 15px auto; display: none; border-radius: 12px; overflow: hidden; border: 2px dashed #ff9800;"></div>
         <label for="produto">Produto:</label>
         <select name="produto" id="produto">
             <option value="produto">Selecione o produto</option>
@@ -65,6 +70,7 @@
         <label for="quantidade">Quantidade:</label>
         <input type="number" id="quantidade">
         <button id="btnConfirmarVenda">Confirmar Venda</button>
+
     </section>
     
     <section id="containerrelatorios" style="padding: 20px;">
@@ -102,5 +108,6 @@
     </nav>
     <script type="module" src="server/dashBoard.js"></script>
     <script type="module" src="server/navigation.js"></script>
+    <script type="module" src="server/bipar.js"></script>
 </body>
 </html>

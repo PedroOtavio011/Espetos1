@@ -67,6 +67,7 @@ const inputPrecoCusto = document.getElementById("precoCusto");
 const inputPrecoVenda = document.getElementById("precoProduto");
 const inputEstoqueInicial = document.getElementById("estoqueInicial");
 const btnCadastrar = document.getElementById("btnCadastrarProduto");
+const qrCodeInput = document.getElementById("qrCode");
 
 if (btnCadastrar) {
   btnCadastrar.addEventListener("click", async () => {
@@ -76,9 +77,9 @@ if (btnCadastrar) {
     const precoCusto = parseFloat(inputPrecoCusto.value);
     const precoVenda = parseFloat(inputPrecoVenda.value);
     const estoque = parseInt(inputEstoqueInicial.value);
-
+    const qrCode = qrCodeInput.value;
     console.log(
-      `📝 [Dados Capturados] Nome: ${nome}, Categoria: ${categoria}, Custo: ${precoCusto}, Venda: ${precoVenda}, Estoque: ${estoque}`,
+      `📝 [Dados Capturados] Nome: ${nome}, Categoria: ${categoria}, Custo: ${precoCusto}, Venda: ${precoVenda}, Estoque: ${estoque}, QR Code: ${qrCode}`,
     );
 
     if (
@@ -86,7 +87,8 @@ if (btnCadastrar) {
       !categoria ||
       isNaN(precoCusto) ||
       isNaN(precoVenda) ||
-      isNaN(estoque)
+      isNaN(estoque) ||
+      !qrCode
     ) {
       console.warn(
         "⚠️ [Validação] Falha: Campos obrigatórios vazios ou inválidos no cadastro.",
@@ -106,6 +108,7 @@ if (btnCadastrar) {
         preco_venda: precoVenda,
         estoque: estoque,
         criado_em: serverTimestamp(),
+        qr_code: qrCode,
       });
 
       console.log(
@@ -596,3 +599,9 @@ async function verificarEstoqueCritico() {
     );
   }
 }
+document.addEventListener("vendaAtualizada", () => {
+    console.log("🔄 [Interface] Atualizando dados da tela pós-escaneamento...");
+    carregarProdutosNosSelects();
+    carregarResumosDoDia();
+    verificarEstoqueCritico();
+});
