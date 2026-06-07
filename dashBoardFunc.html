@@ -10,14 +10,14 @@
     <main>
         <header>
             <h1>Dashboard Funcionário</h1>
+            <button style="margin-top: 20px; width: 100%; padding: 12px; background: #ff9800; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 15px;" onclick="window.location.href='dashBoard.html'">Voltar ao Dashboard</button>
         </header>
         
         <label for="func">Funcionário:</label>
         <select id="func" name="func">
             <option value="">Escolha um funcionário:</option>
-            <option value="João">João (Churrasqueiro)</option>
-            <option value="Maria">Maria (Caixa)</option>
-            <option value="Pedro">Pedro (Atendente)</option>
+            <option value="João">Romário</option>
+            <option value="Maria">Rafaela</option>
         </select>
         
         <label for="produtoFunc">Produto:</label>
@@ -30,9 +30,14 @@
         
         <button id="btnConfirmarInterno">Confirmar</button>
 
-        <div style="margin-top: 30px; border-top: 1px solid #444; padding-top: 20px;">
+    <div style="margin-top: 30px; border-top: 1px solid #444; padding-top: 20px;">
     <h2 style="color: #ff9800; font-size: 1.2rem; margin-bottom: 15px;">📊 Relatório de Custos (Consumo)</h2>
     
+    <div style="display: flex; gap: 8px; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 12px;">
+        <button id="btnModoProdutos" style="flex: 1; padding: 10px; background: #ff9800; color: #fff; border: 1px solid #ff9800; border-radius: 6px; cursor: pointer; font-weight: bold;">Busca por Produtos</button>
+        <button id="btnModoTotal" style="flex: 1; padding: 10px; background: #2a2a2a; color: #fff; border: 1px solid #444; border-radius: 6px; cursor: pointer; font-weight: bold;">Busca Total</button>
+    </div>
+
     <div style="display: flex; gap: 8px; margin-bottom: 15px;">
         <button id="btnFuncDiario" style="flex: 1; padding: 10px; background: #2a2a2a; color: #fff; border: 1px solid #444; border-radius: 6px; cursor: pointer; font-weight: bold;">Diário</button>
         <button id="btnFuncSemanal" style="flex: 1; padding: 10px; background: #2a2a2a; color: #fff; border: 1px solid #444; border-radius: 6px; cursor: pointer; font-weight: bold;">Semanal</button>
@@ -46,14 +51,8 @@
 
     <div style="max-height: 250px; overflow-y: auto; background: #1a1a1a; border-radius: 6px; padding: 10px;">
         <table style="width: 100%; border-collapse: collapse; font-size: 13px; color: #fff;">
-            <thead>
-                <tr style="border-bottom: 1px solid #444; color: #ff9800; text-align: left;">
-                    <th style="padding: 6px;">Funcionário</th>
-                    <th style="padding: 6px;">O que consumiu</th>
-                    <th style="padding: 6px; text-align: center;">Total Qtd</th>
-                    <th style="padding: 6px; text-align: right;">Custo Acumulado</th>
-                </tr>
-            </thead>
+            <thead id="cabecalhoTabelaFunc">
+                </thead>
             <tbody id="tabelaConsumoFunc">
                 </tbody>
         </table>

@@ -744,7 +744,7 @@ if (btnSalvarAlteracao) {
     });
 }
 // ==========================================
-// 11. RECURSO: CONSUMO DE FUNCIONÁRIOS & ESTOQUE (CORRIGIDO)
+// 11. RECURSO: CONSUMO DE FUNCIONÁRIOS & ESTOQUE (MODO DE VISÃO DUPLA)
 // ==========================================
 
 const btnConfirmarInterno = document.getElementById("btnConfirmarInterno");
@@ -752,12 +752,35 @@ const selectFuncionario = document.getElementById("func");
 const selectProdutoFunc = document.getElementById("produtoFunc");
 const inputQuantidadeFunc = document.getElementById("quantidade");
 
-// Captura dos botões de período do funcionário
+// Elementos de Controle de Interface
+const btnModoProdutos = document.getElementById("btnModoProdutos");
+const btnModoTotal = document.getElementById("btnModoTotal");
 const btnFuncDiario = document.getElementById("btnFuncDiario");
 const btnFuncSemanal = document.getElementById("btnFuncSemanal");
 const btnFuncMensal = document.getElementById("btnFuncMensal");
 
-// 🟢 FIX: Declarada explicitamente no escopo global do arquivo para evitar o ReferenceError
+// Variáveis de Estado do Relatório
+let modoRelatorioAtual = "produtos"; // Pode ser "produtos" ou "total"
+let periodoDiasAtual = 0; // Padrão: Diário (0)
+
+// Altera o visual dos botões de modo (Produtos vs Total)
+function alternarVisualModos(modoSelecionado) {
+    if (!btnModoProdutos || !btnModoTotal) return;
+    
+    if (modoSelecionado === "produtos") {
+        btnModoProdutos.style.background = "#ff9800";
+        btnModoProdutos.style.borderColor = "#ff9800";
+        btnModoTotal.style.background = "#2a2a2a";
+        btnModoTotal.style.borderColor = "#444";
+    } else {
+        btnModoTotal.style.background = "#ff9800";
+        btnModoTotal.style.borderColor = "#ff9800";
+        btnModoProdutos.style.background = "#2a2a2a";
+        btnModoProdutos.style.borderColor = "#444";
+    }
+}
+
+// Altera o visual dos botões de período (Diário, Semanal, Mensal)
 function alternarEstiloBotoesFunc(botaoAtivo) {
     const botoes = [btnFuncDiario, btnFuncSemanal, btnFuncMensal];
     botoes.forEach(btn => {
@@ -767,7 +790,7 @@ function alternarEstiloBotoesFunc(botaoAtivo) {
         }
     });
     if (botaoAtivo) {
-        botaoAtivo.style.background = "#ff9800"; // Laranja ativo
+        botaoAtivo.style.background = "#ff9800";
         botaoAtivo.style.borderColor = "#ff9800";
     }
 }
@@ -783,97 +806,99 @@ if (btnConfirmarInterno && selectFuncionario) {
         if (!idProduto) return alert("Selecione o produto consumido!");
         if (quantidade <= 0) return alert("A quantidade consumida deve ser maior que zero!");
 
-        console.log(`📥 [Consumo] Processando lançamento para ${funcionario}...`);
-
         try {
             const produtoRef = doc(db, "produtos", idProduto);
             const produtoSnap = await getDoc(produtoRef);
 
-            if (!produtoSnap.exists()) {
-                alert("Produto não encontrado no banco de dados.");
-                return;
-            }
+            if (!produtoSnap.exists()) return alert("Produto não encontrado.");
 
             const dadosProduto = produtoSnap.data();
             const estoqueAtual = parseInt(dadosProduto.estoque) || 0;
             const precoCustoUnitario = parseFloat(dadosProduto.preco_custo) || 0;
 
             if (estoqueAtual < quantidade) {
-                alert(`Estoque insuficiente! O produto possui apenas ${estoqueAtual} unidades em estoque.`);
+                alert(`Estoque insuficiente! Restam apenas ${estoqueAtual} unidades.`);
                 return;
             }
 
-            const novoEstoque = estoqueAtual - quantidade;
-            await updateDoc(produtoRef, { estoque: novoEstoque });
-            console.log(`📉 [Estoque] Baixa efetuada com sucesso. Novo estoque: ${novoEstoque}`);
-
-            const custoTotalConsumido = precoCustoUnitario * quantidade;
+            await updateDoc(produtoRef, { estoque: estoqueAtual - quantidade });
             
             await addDoc(collection(db, "consumo_interno"), {
                 funcionario: funcionario,
                 produtoNome: dadosProduto.nome,
                 idProduto: idProduto,
                 quantidade: quantidade,
-                custoTotal: custoTotalConsumido,
+                custoTotal: precoCustoUnitario * quantidade,
                 dataLancamento: new Date()
             });
-            console.log(`✅ [Consumo] Registro de custo adicionado para ${funcionario}.`);
 
-            alert("Consumo lançado e estoque atualizado com sucesso!");
-
+            alert("Consumo lançado com sucesso!");
             inputQuantidadeFunc.value = 1;
             selectProdutoFunc.value = "";
             
             carregarProdutosNosSelects(); 
-            carregarRelatorioConsumoFuncionarios(0, btnFuncDiario); // Força a atualização no Diário
+            carregarRelatorioConsumoFuncionarios(periodoDiasAtual); 
 
         } catch (error) {
-            console.error("❌ [Erro Crítico] Falha ao processar consumo interno:", error);
-            alert("Erro ao salvar no banco: " + error.message);
+            console.error("❌ [Erro] Falha ao processar consumo:", error);
         }
     });
 }
 
-// Função analítica de Relatório com Agrupamento por Nome + Produto
+// Função analítica de Relatório com Duplo Agrupamento (Por Produto ou Busca Total)
 async function carregarRelatorioConsumoFuncionarios(diasParaTratras = 0, botaoAcionado = null) {
     const tabelaBody = document.getElementById("tabelaConsumoFunc");
+    const tabelaCabecalho = document.getElementById("cabecalhoTabelaFunc");
     const divCustoTotal = document.getElementById("custoTotalFuncionarios");
     
-    if (!tabelaBody || !divCustoTotal) return;
+    if (!tabelaBody || !divCustoTotal || !tabelaCabecalho) return;
 
-    // Aplica o estilo visual nos botões
+    periodoDiasAtual = diasParaTratras; // Salva o estado global do período rodando
+
     if (botaoAcionado) {
         alternarEstiloBotoesFunc(botaoAcionado);
-    } else if (diasParaTratras === 0 && btnFuncDiario) {
-        alternarEstiloBotoesFunc(btnFuncDiario);
+    }
+
+    // Configura o Cabeçalho da Tabela dinamicamente baseado no modo ativo
+    if (modoRelatorioAtual === "produtos") {
+        tabelaCabecalho.innerHTML = `
+            <tr style="border-bottom: 1px solid #444; color: #ff9800; text-align: left;">
+                <th style="padding: 6px;">Funcionário</th>
+                <th style="padding: 6px;">O que consumiu</th>
+                <th style="padding: 6px; text-align: center;">Total Qtd</th>
+                <th style="padding: 6px; text-align: right;">Custo</th>
+            </tr>
+        `;
+    } else {
+        tabelaCabecalho.innerHTML = `
+            <tr style="border-bottom: 1px solid #444; color: #ff9800; text-align: left;">
+                <th style="padding: 6px;">Funcionário</th>
+                <th style="padding: 6px; text-align: center;">Total Itens Gastos</th>
+                <th style="padding: 6px; text-align: right;">Custo Acumulado Total</th>
+            </tr>
+        `;
     }
 
     try {
         const dataLimite = new Date();
         dataLimite.setHours(0, 0, 0, 0);
-        if (diasParaTratras > 0) {
-            dataLimite.setDate(dataLimite.getDate() - diasParaTratras);
-        }
-
-        console.log(`🔍 [Relatório Func] Buscando consumos a partir de: ${dataLimite.toISOString()}`);
+        if (diasParaTratras > 0) dataLimite.setDate(dataLimite.getDate() - diasParaTratras);
         
-        const q = query(
-            collection(db, "consumo_interno"), 
-            where("dataLancamento", ">=", dataLimite)
-        );
+        const q = query(collection(db, "consumo_interno"), where("dataLancamento", ">=", dataLimite));
         const querySnapshot = await getDocs(q);
 
         tabelaBody.innerHTML = "";
         let custoAcumuladoGeral = 0;
         
         const consumosBrutos = [];
-        querySnapshot.forEach((doc) => {
-            consumosBrutos.push(doc.data());
-        });
+        querySnapshot.forEach((doc) => consumosBrutos.push(doc.data()));
 
-        // Algoritmo de Agrupamento
+        // AQUI ESTÁ A INTELIGÊNCIA DO FILTRO DUPLO:
         const consumosAgrupados = consumosBrutos.reduce((acumulador, itemAtual) => {
-            const chaveUnica = `${itemAtual.funcionario}_${itemAtual.produtoNome}`;
+            // Se o modo for 'produtos', a chave junta Nome+Produto. Se for 'total', junta APENAS o Nome.
+            const chaveUnica = modoRelatorioAtual === "produtos" 
+                ? `${itemAtual.funcionario}_${itemAtual.produtoNome}`
+                : `${itemAtual.funcionario}`;
             
             const qtdAtual = parseInt(itemAtual.quantidade) || 0;
             const custoAtual = parseFloat(itemAtual.custoTotal) || 0;
@@ -898,32 +923,59 @@ async function carregarRelatorioConsumoFuncionarios(diasParaTratras = 0, botaoAc
         listaAgrupadaParaTela.forEach((registro) => {
             custoAcumuladoGeral += registro.custoTotalAcumulado;
 
-            tabelaBody.innerHTML += `
-                <tr style="border-bottom: 1px solid #2a2a2a;">
-                    <td style="padding: 10px 6px; font-weight: 500;">${registro.funcionario}</td>
-                    <td style="padding: 10px 6px; color: #aaa;">${registro.produtoNome}</td>
-                    <td style="padding: 10px 6px; text-align: center; color: #ff9800; font-weight: bold;">${registro.quantidadeTotal}x</td>
-                    <td style="padding: 10px 6px; text-align: right; color: #ff4444; font-weight: bold;">
-                        R$ ${registro.custoTotalAcumulado.toFixed(2)}
-                    </td>
-                </tr>
-            `;
+            if (modoRelatorioAtual === "produtos") {
+                // Modo 1: Visão por Produto
+                tabelaBody.innerHTML += `
+                    <tr style="border-bottom: 1px solid #2a2a2a;">
+                        <td style="padding: 10px 6px;">${registro.funcionario}</td>
+                        <td style="padding: 10px 6px; color: #aaa;">${registro.produtoNome}</td>
+                        <td style="padding: 10px 6px; text-align: center; color: #ff9800; font-weight: bold;">${registro.quantidadeTotal}x</td>
+                        <td style="padding: 10px 6px; text-align: right; color: #ff4444; font-weight: bold;">R$ ${registro.custoTotalAcumulado.toFixed(2)}</td>
+                    </tr>
+                `;
+            } else {
+                // Modo 2: Busca Total (Apenas funcionário e quantidade agregada)
+                tabelaBody.innerHTML += `
+                    <tr style="border-bottom: 1px solid #2a2a2a;">
+                        <td style="padding: 10px 6px; font-weight: bold; font-size: 14px;">${registro.funcionario}</td>
+                        <td style="padding: 10px 6px; text-align: center; color: #00bcd4; font-weight: bold; font-size: 14px;">${registro.quantidadeTotal} unidades</td>
+                        <td style="padding: 10px 6px; text-align: right; color: #ff4444; font-weight: bold; font-size: 14px;">R$ ${registro.custoTotalAcumulado.toFixed(2)}</td>
+                    </tr>
+                `;
+            }
         });
 
         divCustoTotal.innerText = `R$ ${custoAcumuladoGeral.toFixed(2)}`;
         
         if (listaAgrupadaParaTela.length === 0) {
-            tabelaBody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 20px; color: #aaa;">Nenhum consumo registrado neste período.</td></tr>`;
+            tabelaBody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 20px; color: #aaa;">Nenhum consumo registrado.</td></tr>`;
         }
 
-        console.log("📊 [Relatório Func] Consolidação e agrupamento concluídos.");
-
     } catch (error) {
-        console.error("❌ [Erro Relatório] Falha ao renderizar histórico agrupado:", error);
+        console.error("❌ [Erro] Falha ao renderizar:", error);
     }
 }
 
-// Configuração dos escutadores de evento dos botões de período
+// Escutadores dos Botões Superiores de Modo de Busca
+if (btnModoProdutos) {
+    btnModoProdutos.addEventListener("click", () => {
+        modoRelatorioAtual = "produtos";
+        alternarVisualModos("produtos");
+        carregarRelatorioConsumoFuncionarios(periodoDiasAtual);
+    });
+}
+
+if (btnModoTotal) {
+    btnModoTotal.addEventListener("click", () => {
+        modoRelatorioAtual = "total";
+        alternarVisualModos("total");
+        carregarRelatorioConsumoFuncionarios(periodoDiasAtual);
+    });
+}
+
+// Escutadores de período
 if (btnFuncDiario) btnFuncDiario.addEventListener("click", () => carregarRelatorioConsumoFuncionarios(0, btnFuncDiario));
 if (btnFuncSemanal) btnFuncSemanal.addEventListener("click", () => carregarRelatorioConsumoFuncionarios(7, btnFuncSemanal));
 if (btnFuncMensal) btnFuncMensal.addEventListener("click", () => carregarRelatorioConsumoFuncionarios(30, btnFuncMensal));
+
+window.carregarRelatorioConsumoFuncionarios = carregarRelatorioConsumoFuncionarios;

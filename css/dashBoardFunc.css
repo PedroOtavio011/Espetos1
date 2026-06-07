@@ -110,7 +110,7 @@ select {
 /* ==========================================
    BOTÃO DE CONFIRMAÇÃO
    ========================================== */
-#btnConfirmarVenda {
+#btnConfirmarInterno {
     width: 100%;
     padding: 16px;
     background-color: var(--cor-sucesso); /* Verde para dar a ideia de sucesso/lançamento */
@@ -125,11 +125,11 @@ select {
     box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
 }
 
-#btnConfirmarVenda:hover {
+#btnConfirmarInterno:hover {
     background-color: #43a047;
 }
 
 /* Efeito de clique físico no celular */
-#btnConfirmarVenda:active {
+#btnConfirmarInterno:active {
     transform: scale(0.98);
 }
