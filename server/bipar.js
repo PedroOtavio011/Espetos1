@@ -114,6 +114,7 @@ async function processarTransacaoFirebase(codigoLido) {
         const precoVenda = Number(dadosProduto.preco_venda) || 0;
         const precoCusto = Number(dadosProduto.preco_custo) || 0;
 
+
         // Operação Atômica de Venda Mestre
         const novaVendaRef = await addDoc(collection(db, "vendas"), {
             faturamento_total: precoVenda,

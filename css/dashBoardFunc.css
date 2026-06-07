@@ -1,0 +1,135 @@
+
+/* ==========================================
+   ESTILO GLOBAL E VARIÁVEIS (TEMA ESCURO)
+   ========================================== */
+:root {
+    --bg-principal: #121212;
+    --bg-card: #1e1e1e;
+    --bg-input: #2a2a2a;
+    --cor-borda: #444444;
+    --cor-texto: #ffffff;
+    --cor-texto-mutado: #aaaaaa;
+    --cor-primaria: #ff9800; /* Laranja padrão do Espetinho */
+    --cor-primaria-hover: #e68a00;
+    --cor-sucesso: #4caf50;
+}
+
+* {
+    margin: 0;
+    padding: 0;
+    box-sizing: border-box;
+    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    -webkit-tap-highlight-color: transparent; /* Remove o flash azul ao tocar no mobile */
+}
+
+body {
+    background-color: var(--bg-principal);
+    color: var(--cor-texto);
+    display: flex;
+    justify-content: center;
+    align-items: flex-start;
+    min-height: 100vh;
+    padding: 20px;
+}
+
+/* ==========================================
+   CONTAINER PRINCIPAL (LAYOUT MOBILE-FIRST)
+   ========================================== */
+main {
+    background-color: var(--bg-card);
+    width: 100%;
+    max-width: 480px; /* Tamanho ideal para parecer um app de celular */
+    border-radius: 12px;
+    padding: 24px;
+    box-shadow: 0 8px 24px rgba(0, 0, 0, 0.5);
+    border: 1px solid rgba(255, 152, 0, 0.1); /* Sutil borda laranja */
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+}
+
+/* ==========================================
+   HEADER
+   ========================================== */
+header {
+    text-align: center;
+    margin-bottom: 8px;
+    border-bottom: 2px solid var(--cor-primaria);
+    padding-bottom: 12px;
+}
+
+header h1 {
+    font-size: 1.5rem;
+    font-weight: 600;
+    color: var(--cor-primaria);
+    letter-spacing: 0.5px;
+}
+
+/* ==========================================
+   FORMULÁRIO: LABELS E INPUTS
+   ========================================== */
+label {
+    font-size: 0.9rem;
+    font-weight: 500;
+    color: var(--cor-texto-mutado);
+    margin-bottom: -6px; /* Aproxima a label do seu respectivo campo */
+    display: block;
+}
+
+select, 
+input[type="number"] {
+    width: 100%;
+    padding: 14px; /* Maior área de toque para os dedos no celular */
+    background-color: var(--bg-input);
+    border: 1px solid var(--cor-borda);
+    color: var(--cor-texto);
+    border-radius: 8px;
+    font-size: 1rem;
+    transition: all 0.2s ease;
+    outline: none;
+}
+
+/* Efeito de foco nos inputs e selects */
+select:focus, 
+input[type="number"]:focus {
+    border-color: var(--cor-primaria);
+    box-shadow: 0 0 0 3px rgba(255, 152, 0, 0.2);
+}
+
+/* Customização leve da seta do select no mobile */
+select {
+    cursor: pointer;
+    appearance: none;
+    -webkit-appearance: none;
+    background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='10' height='10' fill='%23ff9800'><polygon points='0,0 10,0 5,5'/></svg>");
+    background-repeat: no-repeat;
+    background-position: right 14px center;
+    padding-right: 40px;
+}
+
+/* ==========================================
+   BOTÃO DE CONFIRMAÇÃO
+   ========================================== */
+#btnConfirmarVenda {
+    width: 100%;
+    padding: 16px;
+    background-color: var(--cor-sucesso); /* Verde para dar a ideia de sucesso/lançamento */
+    color: #ffffff;
+    border: none;
+    border-radius: 8px;
+    font-size: 1.1rem;
+    font-weight: bold;
+    cursor: pointer;
+    margin-top: 10px;
+    transition: background-color 0.2s ease, transform 0.1s ease;
+    box-shadow: 0 4px 12px rgba(76, 175, 80, 0.3);
+}
+
+#btnConfirmarVenda:hover {
+    background-color: #43a047;
+}
+
+/* Efeito de clique físico no celular */
+#btnConfirmarVenda:active {
+    transform: scale(0.98);
+}

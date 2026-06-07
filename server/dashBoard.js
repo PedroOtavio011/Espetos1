@@ -18,6 +18,7 @@ import {
   getDoc,
   query,
   where,
+  orderBy,
 } from "https://www.gstatic.com/firebasejs/10.12.0/firebase-firestore.js";
 
 console.log("✅ [Firebase] Módulos importados com sucesso.");
@@ -55,6 +56,7 @@ onAuthStateChanged(auth, (user) => {
     carregarProdutosNosSelects();
     carregarResumosDoDia();
     verificarEstoqueCritico();
+    carregarRelatorioConsumoFuncionarios();
   }
 });
 
@@ -138,15 +140,11 @@ async function carregarProdutosNosSelects() {
   console.log(
     "📥 [Dados] Buscando lista de produtos ativos para atualizar os selects...",
   );
+  
+  // Captura os elementos (alguns serão null dependendo da tela aberta)
   const selectEstoque = document.getElementById("nomeProduto");
   const selectVendas = document.getElementById("produto");
-
-  if (!selectEstoque || !selectVendas) {
-    console.warn(
-      "⚠️ [Interface] Elementos de select não encontrados no HTML corrente.",
-    );
-    return;
-  }
+  const selectFunc = document.getElementById("produtoFunc");
 
   try {
     const querySnapshot = await getDocs(collection(db, "produtos"));
@@ -154,20 +152,23 @@ async function carregarProdutosNosSelects() {
       `📊 [Dados] Total de documentos de produtos recebidos: ${querySnapshot.size}`,
     );
 
-    selectEstoque.innerHTML = '<option value="">Selecione o produto</option>';
-    selectVendas.innerHTML = '<option value="">Selecione o produto</option>';
+    // Inicializa os selects resgatando o valor padrão apenas se o elemento existir na tela atual
+    if (selectEstoque) selectEstoque.innerHTML = '<option value="">Selecione o produto</option>';
+    if (selectVendas) selectVendas.innerHTML = '<option value="">Selecione o produto</option>';
+    if (selectFunc) selectFunc.innerHTML = '<option value="">Selecione o produto</option>';
 
     querySnapshot.forEach((doc) => {
       const produto = doc.data();
       const idProduto = doc.id;
       const optionHTML = `<option value="${idProduto}">${produto.nome} (Qtd: ${produto.estoque})</option>`;
 
-      selectEstoque.innerHTML += optionHTML;
-      selectVendas.innerHTML += optionHTML;
+      // Injeta a linha apenas nos elementos presentes no DOM da página aberta
+      if (selectEstoque) selectEstoque.innerHTML += optionHTML;
+      if (selectVendas) selectVendas.innerHTML += optionHTML;
+      if (selectFunc) selectFunc.innerHTML += optionHTML;
     });
-    console.log(
-      "✅ [Interface] Selects de produtos preenchidos e atualizados na tela.",
-    );
+    
+    console.log("✅ [Interface] Selects presentes na tela atualizados com sucesso.");
   } catch (error) {
     console.error(
       "❌ [Erro Firestore] Erro ao buscar produtos para selects: ",
@@ -299,6 +300,7 @@ if (btnConfirmarVenda) {
       const faturamentoTotalVenda = precoVendaMomento * quantidadeVendida;
       const custoTotalVenda = precoCustoMomento * quantidadeVendida;
       const lucroTotalVenda = faturamentoTotalVenda - custoTotalVenda;
+      
 
       console.log(
         `🧮 [Cálculos Financeiros] Faturamento: R$${faturamentoTotalVenda} | Custo: R$${custoTotalVenda} | Lucro: R$${lucroTotalVenda}`,
@@ -741,3 +743,187 @@ if (btnSalvarAlteracao) {
         }
     });
 }
+// ==========================================
+// 11. RECURSO: CONSUMO DE FUNCIONÁRIOS & ESTOQUE (CORRIGIDO)
+// ==========================================
+
+const btnConfirmarInterno = document.getElementById("btnConfirmarInterno");
+const selectFuncionario = document.getElementById("func");
+const selectProdutoFunc = document.getElementById("produtoFunc");
+const inputQuantidadeFunc = document.getElementById("quantidade");
+
+// Captura dos botões de período do funcionário
+const btnFuncDiario = document.getElementById("btnFuncDiario");
+const btnFuncSemanal = document.getElementById("btnFuncSemanal");
+const btnFuncMensal = document.getElementById("btnFuncMensal");
+
+// 🟢 FIX: Declarada explicitamente no escopo global do arquivo para evitar o ReferenceError
+function alternarEstiloBotoesFunc(botaoAtivo) {
+    const botoes = [btnFuncDiario, btnFuncSemanal, btnFuncMensal];
+    botoes.forEach(btn => {
+        if (btn) {
+            btn.style.background = "#2a2a2a";
+            btn.style.borderColor = "#444";
+        }
+    });
+    if (botaoAtivo) {
+        botaoAtivo.style.background = "#ff9800"; // Laranja ativo
+        botaoAtivo.style.borderColor = "#ff9800";
+    }
+}
+
+// Monitor de cliques para registrar o consumo interno
+if (btnConfirmarInterno && selectFuncionario) {
+    btnConfirmarInterno.addEventListener("click", async () => {
+        const funcionario = selectFuncionario.value;
+        const idProduto = selectProdutoFunc.value;
+        const quantidade = parseInt(inputQuantidadeFunc.value) || 0;
+
+        if (!funcionario) return alert("Selecione qual funcionário consumiu o item!");
+        if (!idProduto) return alert("Selecione o produto consumido!");
+        if (quantidade <= 0) return alert("A quantidade consumida deve ser maior que zero!");
+
+        console.log(`📥 [Consumo] Processando lançamento para ${funcionario}...`);
+
+        try {
+            const produtoRef = doc(db, "produtos", idProduto);
+            const produtoSnap = await getDoc(produtoRef);
+
+            if (!produtoSnap.exists()) {
+                alert("Produto não encontrado no banco de dados.");
+                return;
+            }
+
+            const dadosProduto = produtoSnap.data();
+            const estoqueAtual = parseInt(dadosProduto.estoque) || 0;
+            const precoCustoUnitario = parseFloat(dadosProduto.preco_custo) || 0;
+
+            if (estoqueAtual < quantidade) {
+                alert(`Estoque insuficiente! O produto possui apenas ${estoqueAtual} unidades em estoque.`);
+                return;
+            }
+
+            const novoEstoque = estoqueAtual - quantidade;
+            await updateDoc(produtoRef, { estoque: novoEstoque });
+            console.log(`📉 [Estoque] Baixa efetuada com sucesso. Novo estoque: ${novoEstoque}`);
+
+            const custoTotalConsumido = precoCustoUnitario * quantidade;
+            
+            await addDoc(collection(db, "consumo_interno"), {
+                funcionario: funcionario,
+                produtoNome: dadosProduto.nome,
+                idProduto: idProduto,
+                quantidade: quantidade,
+                custoTotal: custoTotalConsumido,
+                dataLancamento: new Date()
+            });
+            console.log(`✅ [Consumo] Registro de custo adicionado para ${funcionario}.`);
+
+            alert("Consumo lançado e estoque atualizado com sucesso!");
+
+            inputQuantidadeFunc.value = 1;
+            selectProdutoFunc.value = "";
+            
+            carregarProdutosNosSelects(); 
+            carregarRelatorioConsumoFuncionarios(0, btnFuncDiario); // Força a atualização no Diário
+
+        } catch (error) {
+            console.error("❌ [Erro Crítico] Falha ao processar consumo interno:", error);
+            alert("Erro ao salvar no banco: " + error.message);
+        }
+    });
+}
+
+// Função analítica de Relatório com Agrupamento por Nome + Produto
+async function carregarRelatorioConsumoFuncionarios(diasParaTratras = 0, botaoAcionado = null) {
+    const tabelaBody = document.getElementById("tabelaConsumoFunc");
+    const divCustoTotal = document.getElementById("custoTotalFuncionarios");
+    
+    if (!tabelaBody || !divCustoTotal) return;
+
+    // Aplica o estilo visual nos botões
+    if (botaoAcionado) {
+        alternarEstiloBotoesFunc(botaoAcionado);
+    } else if (diasParaTratras === 0 && btnFuncDiario) {
+        alternarEstiloBotoesFunc(btnFuncDiario);
+    }
+
+    try {
+        const dataLimite = new Date();
+        dataLimite.setHours(0, 0, 0, 0);
+        if (diasParaTratras > 0) {
+            dataLimite.setDate(dataLimite.getDate() - diasParaTratras);
+        }
+
+        console.log(`🔍 [Relatório Func] Buscando consumos a partir de: ${dataLimite.toISOString()}`);
+        
+        const q = query(
+            collection(db, "consumo_interno"), 
+            where("dataLancamento", ">=", dataLimite)
+        );
+        const querySnapshot = await getDocs(q);
+
+        tabelaBody.innerHTML = "";
+        let custoAcumuladoGeral = 0;
+        
+        const consumosBrutos = [];
+        querySnapshot.forEach((doc) => {
+            consumosBrutos.push(doc.data());
+        });
+
+        // Algoritmo de Agrupamento
+        const consumosAgrupados = consumosBrutos.reduce((acumulador, itemAtual) => {
+            const chaveUnica = `${itemAtual.funcionario}_${itemAtual.produtoNome}`;
+            
+            const qtdAtual = parseInt(itemAtual.quantidade) || 0;
+            const custoAtual = parseFloat(itemAtual.custoTotal) || 0;
+
+            if (!acumulador[chaveUnica]) {
+                acumulador[chaveUnica] = {
+                    funcionario: itemAtual.funcionario,
+                    produtoNome: itemAtual.produtoNome,
+                    quantidadeTotal: 0,
+                    custoTotalAcumulado: 0
+                };
+            }
+
+            acumulador[chaveUnica].quantidadeTotal += qtdAtual;
+            acumulador[chaveUnica].custoTotalAcumulado += custoAtual;
+
+            return acumulador;
+        }, {});
+
+        const listaAgrupadaParaTela = Object.values(consumosAgrupados);
+
+        listaAgrupadaParaTela.forEach((registro) => {
+            custoAcumuladoGeral += registro.custoTotalAcumulado;
+
+            tabelaBody.innerHTML += `
+                <tr style="border-bottom: 1px solid #2a2a2a;">
+                    <td style="padding: 10px 6px; font-weight: 500;">${registro.funcionario}</td>
+                    <td style="padding: 10px 6px; color: #aaa;">${registro.produtoNome}</td>
+                    <td style="padding: 10px 6px; text-align: center; color: #ff9800; font-weight: bold;">${registro.quantidadeTotal}x</td>
+                    <td style="padding: 10px 6px; text-align: right; color: #ff4444; font-weight: bold;">
+                        R$ ${registro.custoTotalAcumulado.toFixed(2)}
+                    </td>
+                </tr>
+            `;
+        });
+
+        divCustoTotal.innerText = `R$ ${custoAcumuladoGeral.toFixed(2)}`;
+        
+        if (listaAgrupadaParaTela.length === 0) {
+            tabelaBody.innerHTML = `<tr><td colspan="4" style="text-align: center; padding: 20px; color: #aaa;">Nenhum consumo registrado neste período.</td></tr>`;
+        }
+
+        console.log("📊 [Relatório Func] Consolidação e agrupamento concluídos.");
+
+    } catch (error) {
+        console.error("❌ [Erro Relatório] Falha ao renderizar histórico agrupado:", error);
+    }
+}
+
+// Configuração dos escutadores de evento dos botões de período
+if (btnFuncDiario) btnFuncDiario.addEventListener("click", () => carregarRelatorioConsumoFuncionarios(0, btnFuncDiario));
+if (btnFuncSemanal) btnFuncSemanal.addEventListener("click", () => carregarRelatorioConsumoFuncionarios(7, btnFuncSemanal));
+if (btnFuncMensal) btnFuncMensal.addEventListener("click", () => carregarRelatorioConsumoFuncionarios(30, btnFuncMensal));
