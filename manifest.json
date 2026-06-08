@@ -1,0 +1,21 @@
+{
+  "short_name": "EspetosApp",
+  "name": "Sistema de Gestão de Espetos",
+  "icons": [
+    {
+      "src": "icone-192.png",
+      "type": "image/png",
+      "sizes": "192x192"
+    },
+    {
+      "src": "icone-512.png",
+      "type": "image/png",
+      "sizes": "512x512"
+    }
+  ],
+  "start_url": "./dashBoardFunc.html",
+  "background_color": "#1a1a1a",
+  "display": "standalone",
+  "theme_color": "#ff9800",
+  "orientation": "portrait"
+}

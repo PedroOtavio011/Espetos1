@@ -6,6 +6,21 @@
     <title>DashBoard</title>
     <link rel="stylesheet" href="css/dashBoard.css">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html5-qrcode/2.3.8/html5-qrcode.min.js"></script>
+    <link rel="manifest" href="manifest.json">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="EspetosApp">
+    <link rel="apple-touch-icon" href="icone-192.png">
+
+    <script>
+    if ('serviceWorker' in navigator) {
+        window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./sw.js')
+            .then(reg => console.log('🚀 Aplicativo registrado com sucesso!', reg))
+            .catch(err => console.log('❌ Erro ao registrar aplicativo', err));
+        });
+    }
+</script>
 </head>
 <body>
     <header>Olá Empreendedor!</header>
