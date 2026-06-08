@@ -31,6 +31,7 @@ let html5QrcodeScanner = null;
 let estaEscaneando = false;
 let ultimaLeituraTime = 0;
 let ultimoCodigoLido = "";
+let processandoVenda = false;
 
 const btnCamera = document.getElementById("btnAlternarCamera");
 const containerCamera = document.getElementById("leitor-camera");
@@ -79,21 +80,36 @@ function iniciarScannerContinuo() {
 
 // Handler da biblioteca isolado para não engolir erros síncronos
 function onScanSuccess(decodedText, decodedResult) {
+    // Se já tiver uma venda rodando no Firebase, ignora completamente qualquer nova leitura
+    if (processandoVenda) {
+        console.log("⏳ [Scanner] Ignorando leitura: Existe uma transação em andamento.");
+        return;
+    }
+
     const agora = Date.now();
-    if (decodedText === ultimoCodigoLido && (agora - ultimaLeituraTime) < 2500) {
+    if (decodedText === ultimoCodigoLido && (agora - ultimaLeituraTime) < 3000) {
         return; 
     }
+    
+    // Ativa a trava imediatamente para ninguém mais entrar aqui
+    processandoVenda = true;
     ultimaLeituraTime = agora;
     ultimoCodigoLido = decodedText;
 
     alert("Passo 1: Leitura detectada: " + decodedText);
     
+    // ⏸️ PAUSA A CÂMERA: Congela a imagem para o sensor parar de bipar enquanto salvamos no banco
+    if (html5QrcodeScanner && typeof html5QrcodeScanner.pause === "function") {
+        html5QrcodeScanner.pause();
+        console.log("⏸️ [Scanner] Câmera pausada para processamento.");
+    }
+    
     // Execução assíncrona desacoplada da biblioteca principal
     processarTransacaoFirebase(decodedText).catch(fatalError => {
         alert("Erro Crítico Inesperado: " + fatalError.message);
+        liberarScannerParaProximaLeitura(); // Garante que destrava se algo der muito errado
     });
 }
-
 // Pipeline de persistência isolado
 async function processarTransacaoFirebase(codigoLido) {
     alert("Passo 2: Iniciando busca no Firestore...");
@@ -102,13 +118,13 @@ async function processarTransacaoFirebase(codigoLido) {
         const produtosRef = collection(db, "produtos");
         const q = query(produtosRef, where("qr_code", "==", codigoLido));
         
-        // Se travar exatamente aqui, o problema é conexão de rede ou inicialização do db
         const querySnapshot = await getDocs(q);
         
         alert("Passo 3: Busca respondida. Documentos encontrados: " + querySnapshot.size);
 
         if (querySnapshot.empty) {
             alert(`X: Código [${codigoLido}] inexistente na coleção 'produtos'.`);
+            liberarScannerParaProximaLeitura(); // Código errado: Destrava a câmera para tentar outro
             return;
         }
 
@@ -120,7 +136,6 @@ async function processarTransacaoFirebase(codigoLido) {
 
         const precoVenda = Number(dadosProduto.preco_venda) || 0;
         const precoCusto = Number(dadosProduto.preco_custo) || 0;
-
 
         // Operação Atômica de Venda Mestre
         const novaVendaRef = await addDoc(collection(db, "vendas"), {
@@ -138,7 +153,7 @@ async function processarTransacaoFirebase(codigoLido) {
             categoria_momento: dadosProduto.categoria || "Geral"
         });
 
-        // Atualização de Inventário
+        // penúltimo passo: Atualização de Inventário
         await updateDoc(doc(db, "produtos", idProduto), {
             estoque: increment(-1)
         });
@@ -146,9 +161,12 @@ async function processarTransacaoFirebase(codigoLido) {
         alert("Passo 5: Sucesso total no Firestore!");
         document.dispatchEvent(new Event("vendaAtualizada"));
 
+        // Finalizou com sucesso total? Chama a função que espera o usuário agir e limpa o scanner
+        liberarScannerParaProximaLeitura();
+
     } catch (dbError) {
-        // Captura rejeições de segurança, falta de index ou problemas de escrita
         alert("🚨 FALHA FIRESTORE:\nNome: " + dbError.name + "\nMensagem: " + dbError.message);
+        liberarScannerParaProximaLeitura(); // Erro de rede: Destrava para permitir nova tentativa
     }
 }
 
@@ -162,4 +180,19 @@ function pararScanner() {
     if (html5QrcodeScanner) {
         html5QrcodeScanner.stop().finally(() => { html5QrcodeScanner = null; });
     }
+}
+
+function liberarScannerParaProximaLeitura() {
+    // Damos um tempo de 2 segundos (2000ms) com a câmera congelada/travada.
+    // Isso dá tempo de sobra para o funcionário ver o alert de sucesso e tirar o espeto/lata de frente da câmera.
+    setTimeout(() => {
+        ultimoCodigoLido = ""; // Limpa o último código para permitir bipar o mesmo produto em seguida
+        processandoVenda = false; // Abre o cadeado lógico
+        
+        // ▶️ RETOMA A CÂMERA: Volta a procurar códigos na imagem
+        if (html5QrcodeScanner && estaEscaneando) {
+            html5QrcodeScanner.resume();
+            console.log("▶️ [Scanner] Câmera retomada e pronta para o próximo produto!");
+        }
+    }, 2000); 
 }
