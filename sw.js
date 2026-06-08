@@ -1,4 +1,4 @@
-const CACHE_NAME = 'espetos-v0.1';
+const CACHE_NAME = 'espetos-v2';
 const assets = [
     './index.html',
     './dashboard.html',

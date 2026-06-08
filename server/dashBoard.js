@@ -641,23 +641,83 @@ if (btnSalvarAlteracao) {
 }
 
 // ==========================================
-// 11. RECURSO: CONSUMO DE FUNCIONÁRIOS
+// 11. RECURSO: CONSUMO DE FUNCIONÁRIOS & ESTOQUE (MODO DE VISÃO DUPLA)
 // ==========================================
 const btnConfirmarInterno = document.getElementById("btnConfirmarInterno");
 const selectFuncionario = document.getElementById("func");
 const selectProdutoFunc = document.getElementById("produtoFunc");
 const inputQuantidadeFunc = document.getElementById("quantidade");
 
+// Elementos de Controle de Interface
+const btnModoProdutos = document.getElementById("btnModoProdutos");
+const btnModoTotal = document.getElementById("btnModoTotal");
+const btnFuncDiario = document.getElementById("btnFuncDiario");
+const btnFuncSemanal = document.getElementById("btnFuncSemanal");
+const btnFuncMensal = document.getElementById("btnFuncMensal");
+
+// Variáveis de Estado do Relatório
+let modoRelatorioAtual = "produtos"; // Pode ser "produtos" ou "total"
+let periodoDiasAtual = 0; // Padrão: Diário (0)
+
+// Altera o visual dos botões de modo (Produtos vs Total)
+function alternarVisualModos(modoSelecionado) {
+    if (!btnModoProdutos || !btnModoTotal) return;
+    
+    if (modoSelecionado === "produtos") {
+        btnModoProdutos.style.background = "#ff9800";
+        btnModoProdutos.style.borderColor = "#ff9800";
+        btnModoTotal.style.background = "#2a2a2a";
+        btnModoTotal.style.borderColor = "#444";
+    } else {
+        btnModoTotal.style.background = "#ff9800";
+        btnModoTotal.style.borderColor = "#ff9800";
+        btnModoProdutos.style.background = "#2a2a2a";
+        btnModoProdutos.style.borderColor = "#444";
+    }
+}
+
+// Altera o visual dos botões de período (Diário, Semanal, Mensal)
+function alternarEstiloBotoesFunc(botaoAtivo) {
+    const botoes = [btnFuncDiario, btnFuncSemanal, btnFuncMensal];
+    botoes.forEach(btn => {
+        if (btn) {
+            btn.style.background = "#2a2a2a";
+            btn.style.borderColor = "#444";
+        }
+    });
+    if (botaoAtivo) {
+        botaoAtivo.style.background = "#ff9800";
+        botaoAtivo.style.borderColor = "#ff9800";
+    }
+}
+
+// Ouvintes para alternar os MODOS de exibição do relatório
+if (btnModoProdutos) {
+    btnModoProdutos.addEventListener("click", () => {
+        modoRelatorioAtual = "produtos";
+        alternarVisualModos("produtos");
+        carregarRelatorioConsumoFuncionarios(periodoDiasAtual);
+    });
+}
+
+if (btnModoTotal) {
+    btnModoTotal.addEventListener("click", () => {
+        modoRelatorioAtual = "total";
+        alternarVisualModos("total");
+        carregarRelatorioConsumoFuncionarios(periodoDiasAtual);
+    });
+}
+
+// Monitor de cliques para registrar o consumo interno
 if (btnConfirmarInterno && selectFuncionario) {
     btnConfirmarInterno.addEventListener("click", async () => {
         const funcionario = selectFuncionario.value;
         const idProduto = selectProdutoFunc.value;
         const quantidade = parseInt(inputQuantidadeFunc.value) || 0;
 
-        if (!funcionario || !idProduto || quantidade <= 0) {
-            alert("Preencha todos os campos do consumo interno corretamente!");
-            return;
-        }
+        if (!funcionario) return alert("Selecione qual funcionário consumiu o item!");
+        if (!idProduto) return alert("Selecione o produto consumido!");
+        if (quantidade <= 0) return alert("A quantidade consumida deve ser maior que zero!");
 
         try {
             const produtoRef = doc(db, "produtos", idProduto);
@@ -681,7 +741,7 @@ if (btnConfirmarInterno && selectFuncionario) {
                 produtoNome: dadosProduto.nome,
                 idProduto: idProduto,
                 quantidade: quantidade,
-                custoTotal: precoCustoUnitario * quantity,
+                custoTotal: precoCustoUnitario * quantidade,
                 dataLancamento: new Date()
             });
 
@@ -690,21 +750,137 @@ if (btnConfirmarInterno && selectFuncionario) {
             selectProdutoFunc.value = "";
             
             carregarProdutosNosSelects(); 
-            carregarRelatorioConsumoFuncionarios(0); 
+            carregarRelatorioConsumoFuncionarios(periodoDiasAtual); 
+
         } catch (error) {
             console.error("❌ [Erro] Falha ao processar consumo:", error);
         }
     });
 }
 
-// Adiciona gancho extra para carregar a sincronização de edição quando a carga principal acontecer
+// Função analítica de Relatório com Duplo Agrupamento (Por Produto ou Busca Total)
+async function carregarRelatorioConsumoFuncionarios(diasParaTratras = 0, botaoAcionado = null) {
+    const tabelaBody = document.getElementById("tabelaConsumoFunc");
+    const tabelaCabecalho = document.getElementById("cabecalhoTabelaFunc");
+    const divCustoTotal = document.getElementById("custoTotalFuncionarios");
+    
+    if (!tabelaBody || !divCustoTotal || !tabelaCabecalho) return;
+
+    periodoDiasAtual = diasParaTratras; 
+
+    if (botaoAcionado) {
+        alternarEstiloBotoesFunc(botaoAcionado);
+    }
+
+    // Configura o Cabeçalho da Tabela dinamicamente baseado no modo ativo
+    if (modoRelatorioAtual === "produtos") {
+        tabelaCabecalho.innerHTML = `
+            <tr style="border-bottom: 1px solid #444; color: #ff9800; text-align: left;">
+                <th style="padding: 6px;">Funcionário</th>
+                <th style="padding: 6px;">O que consumiu</th>
+                <th style="padding: 6px; text-align: center;">Total Qtd</th>
+                <th style="padding: 6px; text-align: right;">Custo</th>
+            </tr>
+        `;
+    } else {
+        tabelaCabecalho.innerHTML = `
+            <tr style="border-bottom: 1px solid #444; color: #ff9800; text-align: left;">
+                <th style="padding: 6px;">Funcionário</th>
+                <th style="padding: 6px; text-align: right;">Custo Total Acumulado</th>
+            </tr>
+        `;
+    }
+
+    try {
+        const dataLimite = new Date();
+        dataLimite.setHours(0, 0, 0, 0);
+        if (diasParaTratras > 0) {
+            dataLimite.setDate(dataLimite.getDate() - diasParaTratras);
+        }
+
+        const q = query(collection(db, "consumo_interno"), where("dataLancamento", ">=", dataLimite));
+        const querySnapshot = await getDocs(q);
+
+        let custoGeralPeriodo = 0;
+        tabelaBody.innerHTML = "";
+
+        if (querySnapshot.empty) {
+            tabelaBody.innerHTML = `<tr><td colspan="4" style="padding: 12px; text-align: center; color: #aaa;">Nenhum consumo registrado.</td></tr>`;
+            divCustoTotal.innerText = "R$ 0.00";
+            return;
+        }
+
+        const dadosBrutos = [];
+        querySnapshot.forEach(doc => {
+            const data = doc.data();
+            dadosBrutos.push(data);
+            custoGeralPeriodo += data.custoTotal || 0;
+        });
+
+        // LÓGICA DE VISÃO 1: Agrupado por Funcionário + Produto
+        if (modoRelatorioAtual === "produtos") {
+            const agrupado = dadosBrutos.reduce((acc, curr) => {
+                const chave = `${curr.funcionario}_${curr.produtoNome}`;
+                if (!acc[chave]) {
+                    acc[chave] = {
+                        funcionario: curr.funcionario,
+                        produtoNome: curr.produtoNome,
+                        quantidade: 0,
+                        custoTotal: 0
+                    };
+                }
+                acc[chave].quantidade += curr.quantidade;
+                acc[chave].custoTotal += curr.custoTotal;
+                return acc;
+            }, {});
+
+            Object.values(agrupado).forEach(item => {
+                tabelaBody.innerHTML += `
+                    <tr style="border-bottom: 1px solid #333;">
+                        <td style="padding: 8px;">${item.funcionario}</td>
+                        <td style="padding: 8px; color: #aaa;">${item.produtoNome}</td>
+                        <td style="padding: 8px; text-align: center; font-weight: bold;">${item.quantidade}x</td>
+                        <td style="padding: 8px; text-align: right; color: #ff4444;">R$ ${item.custoTotal.toFixed(2)}</td>
+                    </tr>
+                `;
+            });
+
+        // LÓGICA DE VISÃO 2: Agrupado apenas por Funcionário (Geral)
+        } else {
+            const agrupadoTotal = dadosBrutos.reduce((acc, curr) => {
+                const chave = curr.funcionario;
+                if (!acc[chave]) {
+                    acc[chave] = { funcionario: chave, custoTotal: 0 };
+                }
+                acc[chave].custoTotal += curr.custoTotal;
+                return acc;
+            }, {});
+
+            Object.values(agrupadoTotal).forEach(item => {
+                tabelaBody.innerHTML += `
+                    <tr style="border-bottom: 1px solid #333;">
+                        <td style="padding: 8px; font-weight: bold;">${item.funcionario}</td>
+                        <td style="padding: 8px; text-align: right; color: #ff4444; font-size: 16px; font-weight: bold;">R$ ${item.custoTotal.toFixed(2)}</td>
+                    </tr>
+                `;
+            });
+        }
+
+        divCustoTotal.innerText = `R$ ${custoGeralPeriodo.toFixed(2)}`;
+
+    } catch (error) {
+        console.error("❌ [Erro Relatório Func] Falha analítica:", error);
+    }
+}
+
+// Ouvintes para os botões de período (Filtros de dias)
+if (btnFuncDiario) btnFuncDiario.addEventListener("click", () => carregarRelatorioConsumoFuncionarios(0, btnFuncDiario));
+if (btnFuncSemanal) btnFuncSemanal.addEventListener("click", () => carregarRelatorioConsumoFuncionarios(7, btnFuncSemanal));
+if (btnFuncMensal) btnFuncMensal.addEventListener("click", () => carregarRelatorioConsumoFuncionarios(30, btnFuncMensal));
+
+// Injeção final necessária para sincronismo do CRUD
 const carregarOriginalModificado = carregarProdutosNosSelects;
 carregarProdutosNosSelects = async function() {
     await carregarOriginalModificado();
     await sincronizarSelectAlterar();
 };
-
-async function carregarRelatorioConsumoFuncionarios(diasParaTratras = 0) {
-    // Mantido para compatibilidade com a assinatura interna original
-    console.log("📊 [Consumo] Carregando relatórios internos...");
-}

@@ -1,81 +1,213 @@
-<!DOCTYPE html>
+<!doctype html>
 <html lang="pt-BR">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>Dashboard Funcionário</title>
-    <link rel="stylesheet" href="css/dashBoardFunc.css">
-    <link rel="manifest" href="manifest.json">
-    <meta name="apple-mobile-web-app-capable" content="yes">
-    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
-    <meta name="apple-mobile-web-app-title" content="EspetosApp">
-    <link rel="apple-touch-icon" href="icone-192.png">
+    <link rel="stylesheet" href="css/dashBoardFunc.css" />
+    <link rel="manifest" href="manifest.json" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta
+      name="apple-mobile-web-app-status-bar-style"
+      content="black-translucent"
+    />
+    <meta name="apple-mobile-web-app-title" content="EspetosApp" />
+    <link rel="apple-touch-icon" href="icone-192.png" />
 
     <script>
-    if ('serviceWorker' in navigator) {
-        window.addEventListener('load', () => {
-        navigator.serviceWorker.register('./sw.js')
-            .then(reg => console.log('🚀 Aplicativo registrado com sucesso!', reg))
-            .catch(err => console.log('❌ Erro ao registrar aplicativo', err));
+      if ("serviceWorker" in navigator) {
+        window.addEventListener("load", () => {
+          navigator.serviceWorker
+            .register("./sw.js")
+            .then((reg) =>
+              console.log("🚀 Aplicativo registrado com sucesso!", reg),
+            )
+            .catch((err) =>
+              console.log("❌ Erro ao registrar aplicativo", err),
+            );
         });
-    }
-</script>
-</head>
-<body>
+      }
+    </script>
+  </head>
+  <body>
     <main>
-        <header>
-            <h1>Dashboard Funcionário</h1>
-            <button style="margin-top: 20px; width: 100%; padding: 12px; background: #ff9800; color: white; border: none; border-radius: 4px; font-weight: bold; cursor: pointer; font-size: 15px;" onclick="window.location.href='dashBoard.html'">Voltar ao Dashboard</button>
-        </header>
-        
-        <label for="func">Funcionário:</label>
-        <select id="func" name="func">
-            <option value="">Escolha um funcionário:</option>
-            <option value="João">Romário</option>
-            <option value="Maria">Rafaela</option>
-        </select>
-        
-        <label for="produtoFunc">Produto:</label>
-        <select name="produto" id="produtoFunc">
-            <option value="">Selecione o produto</option>
-        </select>
-        
-        <label for="quantidade">Quantidade:</label>
-        <input type="number" id="quantidade" min="1" value="1">
-        
-        <button id="btnConfirmarInterno">Confirmar</button>
+      <header>
+        <h1>Dashboard Funcionário</h1>
+        <button
+          style="
+            margin-top: 20px;
+            width: 100%;
+            padding: 12px;
+            background: #ff9800;
+            color: white;
+            border: none;
+            border-radius: 4px;
+            font-weight: bold;
+            cursor: pointer;
+            font-size: 15px;
+          "
+          onclick="window.location.href = 'dashBoard.html'"
+        >
+          Voltar ao Dashboard
+        </button>
+      </header>
 
-    <div style="margin-top: 30px; border-top: 1px solid #444; padding-top: 20px;">
-    <h2 style="color: #ff9800; font-size: 1.2rem; margin-bottom: 15px;">📊 Relatório de Custos (Consumo)</h2>
-    
-    <div style="display: flex; gap: 8px; margin-bottom: 15px; border-bottom: 1px solid #333; padding-bottom: 12px;">
-        <button id="btnModoProdutos" style="flex: 1; padding: 10px; background: #ff9800; color: #fff; border: 1px solid #ff9800; border-radius: 6px; cursor: pointer; font-weight: bold;">Busca por Produtos</button>
-        <button id="btnModoTotal" style="flex: 1; padding: 10px; background: #2a2a2a; color: #fff; border: 1px solid #444; border-radius: 6px; cursor: pointer; font-weight: bold;">Busca Total</button>
-    </div>
+      <label for="func">Funcionário:</label>
+      <select id="func" name="func">
+        <option value="">Escolha um funcionário:</option>
+        <option value="João">Romário</option>
+        <option value="Maria">Rafaela</option>
+      </select>
 
-    <div style="display: flex; gap: 8px; margin-bottom: 15px;">
-        <button id="btnFuncDiario" style="flex: 1; padding: 10px; background: #2a2a2a; color: #fff; border: 1px solid #444; border-radius: 6px; cursor: pointer; font-weight: bold;">Diário</button>
-        <button id="btnFuncSemanal" style="flex: 1; padding: 10px; background: #2a2a2a; color: #fff; border: 1px solid #444; border-radius: 6px; cursor: pointer; font-weight: bold;">Semanal</button>
-        <button id="btnFuncMensal" style="flex: 1; padding: 10px; background: #2a2a2a; color: #fff; border: 1px solid #444; border-radius: 6px; cursor: pointer; font-weight: bold;">Mensal</button>
-    </div>
-    
-    <div style="background: #2a2a2a; padding: 12px; border-radius: 6px; text-align: center; margin-bottom: 15px;">
-        <span style="font-size: 14px; color: #aaa; display: block;">Custo Total no Período</span>
-        <strong id="custoTotalFuncionarios" style="font-size: 22px; color: #ff4444;">R$ 0.00</strong>
-    </div>
+      <label for="produtoFunc">Produto:</label>
+      <select name="produto" id="produtoFunc">
+        <option value="">Selecione o produto</option>
+      </select>
 
-    <div style="max-height: 250px; overflow-y: auto; background: #1a1a1a; border-radius: 6px; padding: 10px;">
-        <table style="width: 100%; border-collapse: collapse; font-size: 13px; color: #fff;">
-            <thead id="cabecalhoTabelaFunc">
-                </thead>
-            <tbody id="tabelaConsumoFunc">
-                </tbody>
-        </table>
-    </div>
-</div>
+      <label for="quantidade">Quantidade:</label>
+      <input type="number" id="quantidade" min="1" value="1" />
 
+      <button id="btnConfirmarInterno">Confirmar</button>
+
+      <div
+        style="margin-top: 30px; border-top: 1px solid #444; padding-top: 20px"
+      >
+        <h2 style="color: #ff9800; font-size: 1.2rem; margin-bottom: 15px">
+          📊 Relatório de Custos (Consumo)
+        </h2>
+
+        <div
+          style="
+            display: flex;
+            gap: 8px;
+            margin-bottom: 15px;
+            border-bottom: 1px solid #333;
+            padding-bottom: 12px;
+          "
+        >
+          <button
+            id="btnModoProdutos"
+            style="
+              flex: 1;
+              padding: 10px;
+              background: #ff9800;
+              color: #fff;
+              border: 1px solid #ff9800;
+              border-radius: 6px;
+              cursor: pointer;
+              font-weight: bold;
+            "
+          >
+            Busca por Produtos
+          </button>
+          <button
+            id="btnModoTotal"
+            style="
+              flex: 1;
+              padding: 10px;
+              background: #2a2a2a;
+              color: #fff;
+              border: 1px solid #444;
+              border-radius: 6px;
+              cursor: pointer;
+              font-weight: bold;
+            "
+          >
+            Busca Total
+          </button>
+        </div>
+
+        <div style="display: flex; gap: 8px; margin-bottom: 15px">
+          <button
+            id="btnFuncDiario"
+            style="
+              flex: 1;
+              padding: 10px;
+              background: #2a2a2a;
+              color: #fff;
+              border: 1px solid #444;
+              border-radius: 6px;
+              cursor: pointer;
+              font-weight: bold;
+            "
+          >
+            Diário
+          </button>
+          <button
+            id="btnFuncSemanal"
+            style="
+              flex: 1;
+              padding: 10px;
+              background: #2a2a2a;
+              color: #fff;
+              border: 1px solid #444;
+              border-radius: 6px;
+              cursor: pointer;
+              font-weight: bold;
+            "
+          >
+            Semanal
+          </button>
+          <button
+            id="btnFuncMensal"
+            style="
+              flex: 1;
+              padding: 10px;
+              background: #2a2a2a;
+              color: #fff;
+              border: 1px solid #444;
+              border-radius: 6px;
+              cursor: pointer;
+              font-weight: bold;
+            "
+          >
+            Mensal
+          </button>
+        </div>
+
+        <div
+          style="
+            background: #2a2a2a;
+            padding: 12px;
+            border-radius: 6px;
+            text-align: center;
+            margin-bottom: 15px;
+          "
+        >
+          <span style="font-size: 14px; color: #aaa; display: block"
+            >Custo Total no Período</span
+          >
+          <strong
+            id="custoTotalFuncionarios"
+            style="font-size: 22px; color: #ff4444"
+            >R$ 0.00</strong
+          >
+        </div>
+
+        <div
+          style="
+            max-height: 250px;
+            overflow-y: auto;
+            background: #1a1a1a;
+            border-radius: 6px;
+            padding: 10px;
+          "
+        >
+          <table
+            style="
+              width: 100%;
+              border-collapse: collapse;
+              font-size: 13px;
+              color: #fff;
+            "
+          >
+            <thead id="cabecalhoTabelaFunc"></thead>
+            <tbody id="tabelaConsumoFunc"></tbody>
+          </table>
+        </div>
+      </div>
     </main>
-    
+
     <script type="module" src="/server/dashBoard.js"></script>
-</body>
+  </body>
 </html>
