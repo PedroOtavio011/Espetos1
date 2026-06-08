@@ -359,7 +359,7 @@ if (btnConfirmarVenda) {
 }
 
 // ==========================================
-// 6. ABA DE RELATÓRIOS INTEGRADA (EM TELA) - REFATORADA (AGRUPADA)
+// 6. ABA DE RELATÓRIOS INTEGRADA (EM TELA) - AGORA POR NOME DE PRODUTO
 // ==========================================
 const txtFaturamentoRelatorio = document.getElementById("faturamentoRelatorio");
 const txtLucroRelatorio = document.getElementById("lucroRelatorio");
@@ -418,25 +418,33 @@ async function gerarRelatorioPorPeriodo(diasParaTratras, botaoAtivo) {
       });
     }
 
+    // 🎯 RESTRUTURADO: Agrupando e somando pelo ID/Nome do Produto individual
     const itensAgrupados = todosOsItensBrutos.reduce((acumulador, itemAtual) => {
-      const chave = itemAtual.categoria_momento || "Geral";
+      const idProduto = itemAtual.produto_id;
+      if (!idProduto) return acumulador;
+
+      // Cruza o ID buscado com o cache de produtos carregado em segundo plano no app
+      const nomeProdutoReal = cacheProdutosLocal[idProduto]?.nome || "Produto Não Identificado";
+
       const quantidadeItem = Number(itemAtual.quantidade) || 0;
       const faturamentoItem = (Number(itemAtual.preco_venda_momento) || 0) * quantidadeItem;
-      const custoItem = (Number(itemAtual.preco_custo_momento) || 0) * quantidadeItem; // (Será re-checada se necessário)
+      const custoItem = (Number(itemAtual.preco_custo_momento) || 0) * quantidadeItem; // Corrigido 'quantityItem' para 'quantidadeItem'
       const lucroItem = faturamentoItem - custoItem;
 
-      if (!acumulador[chave]) {
-        acumulador[chave] = {
-          categoria: chave,
+      // Se é a primeira vez que esse produto aparece no laço, cria a estrutura dele
+      if (!acumulador[idProduto]) {
+        acumulador[idProduto] = {
+          nome: nomeProdutoReal,
           quantidade_total: 0,
           faturamento_total: 0,
           lucro_total: 0
         };
       }
 
-      acumulador[chave].quantidade_total += quantidadeItem;
-      acumulador[chave].faturamento_total += faturamentoItem;
-      acumulador[chave].lucro_total += lucroItem;
+      // Soma os valores ao produto específico
+      acumulador[idProduto].quantidade_total += quantidadeItem;
+      acumulador[idProduto].faturamento_total += faturamentoItem;
+      acumulador[idProduto].lucro_total += lucroItem;
 
       return acumulador;
     }, {});
@@ -448,7 +456,7 @@ async function gerarRelatorioPorPeriodo(diasParaTratras, botaoAtivo) {
       if (listaItensVendidos) {
         listaItensVendidos.innerHTML += `
           <div class="item-vendido-card" style="background: #2a2a2a; padding: 12px; margin-bottom: 10px; border-left: 4px solid #ff9800; border-radius: 6px; text-align: left;">
-              <strong>${item.categoria}</strong> — <strong style="color: #ff9800; font-size: 16px;">${item.quantidade_total}x</strong> un.<br>
+              <strong>${item.nome}</strong> — <strong style="color: #ff9800; font-size: 16px;">${item.quantidade_total}x</strong> un.<br>
               <span style="font-size: 13px; color: #2196f3;">Venda: R$ ${item.faturamento_total.toFixed(2)}</span> | 
               <span style="font-size: 13px; color: #4caf50; font-weight: bold;">Lucro: R$ ${item.lucro_total.toFixed(2)}</span>
           </div>
@@ -466,7 +474,7 @@ async function gerarRelatorioPorPeriodo(diasParaTratras, botaoAtivo) {
         "<p class='feedback-relatorio'>Nenhuma venda registrada neste período.</p>";
     }
     console.log(
-      "✅ [Relatório] Processamento analítico e renderização agrupada concluídos.",
+      "✅ [Relatório] Processamento analítico e renderização por produtos concluídos.",
     );
   } catch (error) {
     console.error(
