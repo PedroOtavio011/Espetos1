@@ -13,7 +13,7 @@
       "sizes": "512x512"
     }
   ],
-  "start_url": "./index.html",
+  "start_url": "./dashBoardFunc.html",
   "background_color": "#1a1a1a",
   "display": "standalone",
   "theme_color": "#ff9800",
