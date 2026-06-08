@@ -57,10 +57,17 @@ function iniciarScannerContinuo() {
         { facingMode: "environment" }, 
         {
             fps: 15, 
+            // ║▌║ AQUI ESTÁ A ADAPTAÇÃO: Força a câmera a aceitar QR Code E códigos de barras
+            formatsToSupport: [ 
+                Html5QrcodeSupportedFormats.QR_CODE, 
+                Html5QrcodeSupportedFormats.EAN_13,
+                Html5QrcodeSupportedFormats.EAN_8
+            ],
+            // 📐 Ajuste de foco: Retangular para facilitar a leitura das latinhas
             qrbox: function(viewfinderWidth, viewfinderHeight) {
-                const minEdge = Math.min(viewfinderWidth, viewfinderHeight);
-                const qrboxSize = Math.floor(minEdge * 0.8); 
-                return { width: qrboxSize, height: qrboxSize };
+                const widthBox = Math.floor(viewfinderWidth * 0.85); // Pega boa parte da largura
+                const heightBox = Math.floor(viewfinderHeight * 0.4); // Fica mais baixo (formato de fita)
+                return { width: widthBox, height: heightBox };
             }
         },
         onScanSuccess 

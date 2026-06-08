@@ -39,7 +39,7 @@ const db = getFirestore(app);
 console.log("🎮 [Firebase] Conexão estabelecida e instâncias prontas.");
 
 // ==========================================
-// 1. GUARDA DE ROTA & INICIALIZAÇÃO CONTROLADA
+// 1. GUARDA DE ROTA: Autenticação
 // ==========================================
 onAuthStateChanged(auth, (user) => {
   console.log("🔐 [Autenticação] Verificando estado do usuário...");
@@ -53,133 +53,15 @@ onAuthStateChanged(auth, (user) => {
       `✅ [Autenticação] Usuário logado com sucesso! UID: ${user.uid}`,
     );
     console.log("📥 [Inicialização] Disparando cargas iniciais de dados...");
-    
-    // 🛡️ SEGURANÇA: As funções que buscam dados do Firestore SÓ rodam aqui dentro agora!
     carregarProdutosNosSelects();
     carregarResumosDoDia();
     verificarEstoqueCritico();
     carregarRelatorioConsumoFuncionarios();
-    
-    // Inicializa o Scanner de Câmera Dupla se o container existir na página atual
-    if (document.getElementById("reader")) {
-        inicializarScannerCameraDupla();
-    }
   }
 });
 
 // ==========================================
-// 2. CONFIGURAÇÃO DO SCANNER: QR CODE & EAN-13 (LATINHAS)
-// ==========================================
-function inicializarScannerCameraDupla() {
-    console.log("📸 [Scanner] Configurando leitura de QR Code + EAN-13...");
-    
-    try {
-        // Define os formatos de código que a câmera vai tentar ler simultaneamente
-        const formatosSuportados = [
-            Html5QrcodeSupportedFormats.QR_CODE, // Códigos quadrados (Comandas/Espetos)
-            Html5QrcodeSupportedFormats.EAN_13,  // Códigos de barra tradicionais (Latinhas)
-            Html5QrcodeSupportedFormats.EAN_8    // Versão menor para produtos pequenos
-        ];
-
-        const html5QrcodeScanner = new Html5QrcodeScanner(
-            "reader", 
-            { 
-                fps: 10, 
-                qrbox: { width: 260, height: 160 }, // Enquadramento retangular ideal para latinhas
-                formatsToSupport: formatosSuportados 
-            },
-            /* verbose= */ false
-        );
-
-        async function onScanSuccess(decodedText) {
-            console.log(`🎯 [Scanner] Código detectado com sucesso: ${decodedText}`);
-            
-            // Pausa temporariamente para evitar leituras duplicadas no mesmo segundo
-            html5QrcodeScanner.clear();
-
-            // Processa a venda buscando o produto correspondente ao código obtido
-            await processarVendaPorCodigoDeCamera(decodedText);
-            
-            // Reinicia o scanner após o término do processamento
-            setTimeout(() => {
-                inicializarScannerCameraDupla();
-            }, 2000);
-        }
-
-        html5QrcodeScanner.render(onScanSuccess, () => {
-            // Callback de erro silencioso para evitar logs repetitivos de foco da lente
-        });
-
-    } catch (error) {
-        console.error("❌ [Scanner] Erro ao instanciar a biblioteca Html5Qrcode:", error);
-    }
-}
-
-// Lógica de processamento de venda via código lido pela câmera
-async function processarVendaPorCodigoDeCamera(codigoIdentificado) {
-    console.log(`🔍 [Firestore] Buscando produto com o código: ${codigoIdentificado}`);
-    
-    try {
-        const q = query(collection(db, "produtos"), where("qr_code", "==", codigoIdentificado.trim()));
-        const querySnapshot = await getDocs(q);
-
-        if (querySnapshot.empty) {
-            alert(`Produto com o código ${codigoIdentificado} não encontrado no sistema!`);
-            return;
-        }
-
-        // Recupera o primeiro produto correspondente localizado
-        const produtoDoc = querySnapshot.docs[0];
-        const idProduto = produtoDoc.id;
-        const dadosProduto = produtoDoc.data();
-        const estoqueAtual = dadosProduto.estoque;
-
-        // Regra de Negócio: Quantidade padrão por bip é 1 item
-        const quantidadeVendida = 1; 
-
-        if (estoqueAtual < quantidadeVendida) {
-            alert(`Estoque insuficiente para ${dadosProduto.nome}! Restam apenas ${estoqueAtual} unidades.`);
-            return;
-        }
-
-        const faturamentoTotalVenda = dadosProduto.preco_venda * quantidadeVendida;
-        const custoTotalVenda = dadosProduto.preco_custo * quantidadeVendida;
-        const lucroTotalVenda = faturamentoTotalVenda - custoTotalVenda;
-
-        // Cria a venda mestre
-        const novaVendaRef = await addDoc(collection(db, "vendas"), {
-            faturamento_total: faturamentoTotalVenda,
-            lucro_total: lucroTotalVenda,
-            criado_em: serverTimestamp(),
-        });
-
-        // Aloca os itens da venda
-        await addDoc(collection(db, "vendas", novaVendaRef.id, "itens"), {
-            produto_id: idProduto,
-            quantidade: quantidadeVendida,
-            preco_venda_momento: dadosProduto.preco_venda,
-            preco_custo_momento: dadosProduto.preco_custo,
-            categoria_momento: dadosProduto.categoria,
-        });
-
-        // Decrementa o estoque
-        await updateDoc(doc(db, "produtos", idProduto), {
-            estoque: increment(-quantidadeVendida),
-        });
-
-        console.log(`✅ [Venda Câmera] Registro efetuado! 1x ${dadosProduto.nome} vendido.`);
-        
-        // Dispara o evento personalizado para atualizar os dados visuais da dashboard
-        document.dispatchEvent(new Event("vendaAtualizada"));
-
-    } catch (error) {
-        console.error("❌ [Erro Venda Câmera] Falha ao processar bip do produto:", error);
-        alert("Erro ao processar o escaneamento do produto.");
-    }
-}
-
-// ==========================================
-// 3. CADASTRO DE PRODUTOS
+// 2. CADASTRO DE PRODUTOS
 // ==========================================
 const inputProd = document.getElementById("prod");
 const inputCat = document.getElementById("cat");
@@ -198,6 +80,9 @@ if (btnCadastrar) {
     const precoVenda = parseFloat(inputPrecoVenda.value);
     const estoque = parseInt(inputEstoqueInicial.value);
     const qrCode = qrCodeInput.value;
+    console.log(
+      `📝 [Dados Capturados] Nome: ${nome}, Categoria: ${categoria}, Custo: ${precoCusto}, Venda: ${precoVenda}, Estoque: ${estoque}, QR Code: ${qrCode}`,
+    );
 
     if (
       !nome ||
@@ -207,12 +92,17 @@ if (btnCadastrar) {
       isNaN(estoque) ||
       !qrCode
     ) {
-      console.warn("⚠️ [Validação] Falha: Campos obrigatórios vazios ou inválidos no cadastro.");
+      console.warn(
+        "⚠️ [Validação] Falha: Campos obrigatórios vazios ou inválidos no cadastro.",
+      );
       alert("Por favor, preencha todos os campos do cadastro corretamente!");
       return;
     }
 
     try {
+      console.log(
+        "📤 [Firestore] Enviando novo produto para a coleção 'produtos'...",
+      );
       await addDoc(collection(db, "produtos"), {
         nome: nome,
         categoria: categoria,
@@ -223,6 +113,9 @@ if (btnCadastrar) {
         qr_code: qrCode,
       });
 
+      console.log(
+        `✅ [Firestore] Produto "${nome}" gravado com sucesso no banco.`,
+      );
       alert(`Produto "${nome}" cadastrado com sucesso!`);
 
       inputProd.value = "";
@@ -230,7 +123,7 @@ if (btnCadastrar) {
       inputPrecoCusto.value = "";
       inputPrecoVenda.value = "";
       inputEstoqueInicial.value = "";
-      qrCodeInput.value = "";
+      console.log("🧹 [Interface] Campos do formulário de cadastro limpos.");
 
       carregarProdutosNosSelects();
     } catch (error) {
@@ -241,15 +134,22 @@ if (btnCadastrar) {
 }
 
 // ==========================================
-// 4. ATUALIZAÇÃO DOS SELECTS
+// 3. ATUALIZAÇÃO DOS SELECTS
 // ==========================================
 async function carregarProdutosNosSelects() {
+  console.log(
+    "📥 [Dados] Buscando lista de produtos ativos para atualizar os selects...",
+  );
+  
   const selectEstoque = document.getElementById("nomeProduto");
   const selectVendas = document.getElementById("produto");
   const selectFunc = document.getElementById("produtoFunc");
 
   try {
     const querySnapshot = await getDocs(collection(db, "produtos"));
+    console.log(
+      `📊 [Dados] Total de documentos de produtos recebidos: ${querySnapshot.size}`,
+    );
 
     if (selectEstoque) selectEstoque.innerHTML = '<option value="">Selecione o produto</option>';
     if (selectVendas) selectVendas.innerHTML = '<option value="">Selecione o produto</option>';
@@ -264,13 +164,18 @@ async function carregarProdutosNosSelects() {
       if (selectVendas) selectVendas.innerHTML += optionHTML;
       if (selectFunc) selectFunc.innerHTML += optionHTML;
     });
+    
+    console.log("✅ [Interface] Selects presentes na tela atualizados com sucesso.");
   } catch (error) {
-    console.error("❌ [Erro Firestore] Erro ao buscar produtos para selects: ", error);
+    console.error(
+      "❌ [Erro Firestore] Erro ao buscar produtos para selects: ",
+      error,
+    );
   }
 }
 
 // ==========================================
-// 5. ENTRADA DE ESTOQUE
+// 4. ENTRADA DE ESTOQUE
 // ==========================================
 const selectEstoque = document.getElementById("nomeProduto");
 const inputQtdEntrada = document.getElementById("qtdEntrada");
@@ -278,32 +183,56 @@ const btnConfirmarEntrada = document.getElementById("btnConfirmarEntrada");
 
 if (btnConfirmarEntrada) {
   btnConfirmarEntrada.addEventListener("click", async () => {
+    console.log("🖱️ [Clique] Botão 'Confirmar Entradas' acionado.");
     const idProduto = selectEstoque.value;
     const quantidadeEntrada = parseInt(inputQtdEntrada.value);
 
-    if (!idProduto || isNaN(quantidadeEntrada) || quantidadeEntrada <= 0) {
-      alert("Por favor, selecione um produto e insira uma quantidade válida!");
+    console.log(
+      `📝 [Dados Capturados] ID Produto: ${idProduto}, Quantidade de Entrada: ${quantidadeEntrada}`,
+    );
+
+    if (!idProduto) {
+      console.warn(
+        "⚠️ [Validação] Falha: Nenhum produto selecionado para entrada de estoque.",
+      );
+      alert("Por favor, selecione um produto da lista.");
+      return;
+    }
+    if (isNaN(quantidadeEntrada) || quantidadeEntrada <= 0) {
+      console.warn(
+        "⚠️ [Validação] Falha: Quantidade de entrada zerada ou inválida.",
+      );
+      alert("Por favor, digite uma quantidade válida maior que zero.");
       return;
     }
 
     try {
       const produtoRef = doc(db, "produtos", idProduto);
+      console.log(
+        `📤 [Firestore] Incrementando (+${quantidadeEntrada}) no estoque do documento: ${idProduto}`,
+      );
+
       await updateDoc(produtoRef, {
         estoque: increment(quantidadeEntrada),
       });
 
-      alert("Estoque atualizado com sucesso!");
+      console.log(
+        "✅ [Firestore] Estoque incrementado com sucesso no servidor.",
+      );
+      alert("Estoque updated com sucesso!");
+
       inputQtdEntrada.value = "";
       carregarProdutosNosSelects();
       verificarEstoqueCritico();
     } catch (error) {
       console.error("❌ [Erro Firestore] Falha ao atualizar estoque:", error);
+      alert("Erro ao atualizar o estoque. Tente novamente.");
     }
   });
 }
 
 // ==========================================
-// 6. FLUXO DE CONFIRMAR VENDA (MANUAL VIA SELECT)
+// 5. FLUXO DE CONFIRMAR VENDA
 // ==========================================
 const selectVendaProduto = document.getElementById("produto");
 const inputQtdVenda = document.getElementById("quantidade");
@@ -311,19 +240,40 @@ const btnConfirmarVenda = document.getElementById("btnConfirmarVenda");
 
 if (btnConfirmarVenda) {
   btnConfirmarVenda.addEventListener("click", async () => {
+    console.log("🖱️ [Clique] Botão 'Confirmar Venda' acionado.");
     const idProduto = selectVendaProduto.value;
     const quantidadeVendida = parseInt(inputQtdVenda.value);
 
-    if (!idProduto || isNaN(quantidadeVendida) || quantidadeVendida <= 0) {
-      alert("Por favor, selecione o produto e informe uma quantidade válida.");
+    console.log(
+      `📝 [Dados Capturados] Venda -> ID Produto: ${idProduto}, Qtd Vendida: ${quantidadeVendida}`,
+    );
+
+    if (!idProduto) {
+      console.warn(
+        "⚠️ [Validação] Falha: Nenhum produto selecionado para realizar venda.",
+      );
+      alert("Por favor, selecione o produto vendido.");
+      return;
+    }
+    if (isNaN(quantidadeVendida) || quantidadeVendida <= 0) {
+      console.warn(
+        "⚠️ [Validação] Falha: Quantidade vendida nula ou inválida.",
+      );
+      alert("Por favor, insira uma quantidade válida.");
       return;
     }
 
     try {
+      console.log(
+        `📥 [Firestore] Verificando consistência e estoque do produto ${idProduto}...`,
+      );
       const produtoRef = doc(db, "produtos", idProduto);
       const produtoSnap = await getDoc(produtoRef);
 
       if (!produtoSnap.exists()) {
+        console.error(
+          "❌ [Erro Regra] Produto selecionado não existe mais no banco de dados.",
+        );
         alert("Produto não encontrado no banco de dados.");
         return;
       }
@@ -332,33 +282,64 @@ if (btnConfirmarVenda) {
       const estoqueAtual = dadosProduto.estoque;
 
       if (estoqueAtual < quantidadeVendida) {
-        alert(`Estoque insuficiente! Você tem apenas ${estoqueAtual} unidades.`);
+        console.warn(
+          `⚠️ [Estoque Insuficiente] Bloqueando venda. Requisitado: ${quantidadeVendida} | Disponível: ${estoqueAtual}`,
+        );
+        alert(
+          `Estoque insuficiente! Você tem apenas ${estoqueAtual} unidades deste produto.`,
+        );
         return;
       }
 
-      const faturamentoTotalVenda = dadosProduto.preco_venda * quantidadeVendida;
-      const custoTotalVenda = dadosProduto.preco_custo * quantidadeVendida;
+      const precoVendaMomento = dadosProduto.preco_venda;
+      const precoCustoMomento = dadosProduto.preco_custo;
+
+      const faturamentoTotalVenda = precoVendaMomento * quantidadeVendida;
+      const custoTotalVenda = precoCustoMomento * quantidadeVendida;
       const lucroTotalVenda = faturamentoTotalVenda - custoTotalVenda;
 
+      console.log(
+        `🧮 [Cálculos Financeiros] Faturamento: R$${faturamentoTotalVenda} | Custo: R$${custoTotalVenda} | Lucro: R$${lucroTotalVenda}`,
+      );
+
+      console.log(
+        "📤 [Firestore] Criando registro mestre na coleção 'vendas'...",
+      );
       const novaVendaRef = await addDoc(collection(db, "vendas"), {
         faturamento_total: faturamentoTotalVenda,
         lucro_total: lucroTotalVenda,
         criado_em: serverTimestamp(),
       });
 
-      await addDoc(collection(db, "vendas", novaVendaRef.id, "itens"), {
+      console.log(
+        `📤 [Firestore] Vinculando itens à subcoleção de vendas ID: ${novaVendaRef.id}`,
+      );
+      const subcolecaoItensRef = collection(
+        db,
+        "vendas",
+        novaVendaRef.id,
+        "itens",
+      );
+      await addDoc(subcolecaoItensRef, {
         produto_id: idProduto,
         quantidade: quantidadeVendida,
-        preco_venda_momento: dadosProduto.preco_venda,
-        preco_custo_momento: dadosProduto.preco_custo,
+        preco_venda_momento: precoVendaMomento,
+        preco_custo_momento: precoCustoMomento,
         categoria_momento: dadosProduto.categoria,
       });
 
+      console.log(
+        `📤 [Firestore] Baixando automaticamente (-${quantidadeVendida}) unidades do estoque do produto.`,
+      );
       await updateDoc(produtoRef, {
         estoque: increment(-quantidadeVendida),
       });
 
-      alert("Venda realizada com sucesso!");
+      console.log(
+        "✅ [Fluxo Completo] Venda gravada, subcoleção populada e estoque decrementado.",
+      );
+      alert("Venda realizada com sucesso e estoque updated!");
+
       inputQtdVenda.value = "";
 
       carregarProdutosNosSelects();
@@ -368,13 +349,17 @@ if (btnConfirmarVenda) {
       const btnDiarioRef = document.getElementById("btnRelatorioDiario");
       if (btnDiarioRef) gerarRelatorioPorPeriodo(0, btnDiarioRef);
     } catch (error) {
-      console.error("❌ [Erro Fluxo Venda] Falha no processamento:", error);
+      console.error(
+        "❌ [Erro Crítico Fluxo Venda] Falha no processamento:",
+        error,
+      );
+      alert("Erro ao confirmar a venda. Tente novamente.");
     }
   });
 }
 
 // ==========================================
-// 7. ABA DE RELATÓRIOS INTEGRADA (AGRUPADA)
+// 6. ABA DE RELATÓRIOS INTEGRADA (EM TELA) - REFATORADA (AGRUPADA)
 // ==========================================
 const txtFaturamentoRelatorio = document.getElementById("faturamentoRelatorio");
 const txtLucroRelatorio = document.getElementById("lucroRelatorio");
@@ -385,8 +370,13 @@ const btnSemanal = document.getElementById("btnRelatorioSemanal");
 const btnMensal = document.getElementById("btnRelatorioMensal");
 
 async function gerarRelatorioPorPeriodo(diasParaTratras, botaoAtivo) {
+  console.log(
+    `📊 [Relatório] Requisitando dados retroativos a ${diasParaTratras} dias.`,
+  );
   try {
-    [btnDiario, btnSemanal, btnMensal].forEach((btn) => btn?.classList.remove("ativo"));
+    [btnDiario, btnSemanal, btnMensal].forEach((btn) =>
+      btn?.classList.remove("ativo"),
+    );
     botaoAtivo?.classList.add("ativo");
 
     const dataLimite = new Date();
@@ -395,19 +385,34 @@ async function gerarRelatorioPorPeriodo(diasParaTratras, botaoAtivo) {
       dataLimite.setDate(dataLimite.getDate() - diasParaTratras);
     }
 
-    const q = query(collection(db, "vendas"), where("criado_em", ">=", dataLimite));
+    console.log(
+      `🔍 [Relatório Query] Filtrando vendas com data de criação >= ${dataLimite.toISOString()}`,
+    );
+    const q = query(
+      collection(db, "vendas"),
+      where("criado_em", ">=", dataLimite),
+    );
     const vendasSnapshot = await getDocs(q);
+
+    console.log(
+      `📊 [Relatório Query] Quantidade de vendas mestre encontradas: ${vendasSnapshot.size}`,
+    );
 
     let faturamentoAcumulado = 0;
     let lucroAcumulado = 0;
+    
     const todosOsItensBrutos = [];
 
     for (const docVenda of vendasSnapshot.docs) {
       const dadosVenda = docVenda.data();
+
       faturamentoAcumulado += dadosVenda.faturamento_total || 0;
       lucroAcumulado += dadosVenda.lucro_total || 0;
 
-      const   itensSnapshot = await getDocs(collection(db, "vendas", docVenda.id, "itens"));
+      const itensSnapshot = await getDocs(
+        collection(db, "vendas", docVenda.id, "itens"),
+      );
+
       itensSnapshot.forEach((docItem) => {
         todosOsItensBrutos.push(docItem.data());
       });
@@ -417,7 +422,7 @@ async function gerarRelatorioPorPeriodo(diasParaTratras, botaoAtivo) {
       const chave = itemAtual.categoria_momento || "Geral";
       const quantidadeItem = Number(itemAtual.quantidade) || 0;
       const faturamentoItem = (Number(itemAtual.preco_venda_momento) || 0) * quantidadeItem;
-      const custoItem = (Number(itemAtual.preco_custo_momento) || 0) * quantidadeItem;
+      const custoItem = (Number(itemAtual.preco_custo_momento) || 0) * quantidadeItem; // (Será re-checada se necessário)
       const lucroItem = faturamentoItem - custoItem;
 
       if (!acumulador[chave]) {
@@ -451,36 +456,66 @@ async function gerarRelatorioPorPeriodo(diasParaTratras, botaoAtivo) {
       }
     });
 
-    if (txtFaturamentoRelatorio) txtFaturamentoRelatorio.innerText = `R$ ${faturamentoAcumulado.toFixed(2)}`;
-    if (txtLucroRelatorio) txtLucroRelatorio.innerText = `R$ ${lucroAcumulado.toFixed(2)}`;
+    if (txtFaturamentoRelatorio)
+      txtFaturamentoRelatorio.innerText = `R$ ${faturamentoAcumulado.toFixed(2)}`;
+    if (txtLucroRelatorio)
+      txtLucroRelatorio.innerText = `R$ ${lucroAcumulado.toFixed(2)}`;
 
     if (listaFinalParaTela.length === 0 && listaItensVendidos) {
-      listaItensVendidos.innerHTML = "<p class='feedback-relatorio'>Nenhuma venda registrada neste período.</p>";
+      listaItensVendidos.innerHTML =
+        "<p class='feedback-relatorio'>Nenhuma venda registrada neste período.</p>";
     }
+    console.log(
+      "✅ [Relatório] Processamento analítico e renderização agrupada concluídos.",
+    );
   } catch (error) {
-    console.error("❌ [Erro Relatório] Falha ao consolidar períodos:", error);
+    console.error(
+      "❌ [Erro Relatório] Erro fatal ao consolidar períodos:",
+      error,
+    );
+    alert("Erro ao processar o relatório. Verifique o console.");
   }
 }
 
-if (btnDiario) btnDiario.addEventListener("click", () => gerarRelatorioPorPeriodo(0, btnDiario));
-if (btnSemanal) btnSemanal.addEventListener("click", () => gerarRelatorioPorPeriodo(7, btnSemanal));
-if (btnMensal) btnMensal.addEventListener("click", () => gerarRelatorioPorPeriodo(30, btnMensal));
+if (btnDiario)
+  btnDiario.addEventListener("click", () =>
+    gerarRelatorioPorPeriodo(0, btnDiario),
+  );
+if (btnSemanal)
+  btnSemanal.addEventListener("click", () =>
+    gerarRelatorioPorPeriodo(7, btnSemanal),
+  );
+if (btnMensal)
+  btnMensal.addEventListener("click", () =>
+    gerarRelatorioPorPeriodo(30, btnMensal),
+  );
 
 // ==========================================
-// 8. RESUMO GERAL DA HOME
+// 7. RESUMO GERAL DA HOME
 // ==========================================
 async function carregarResumosDoDia() {
+  console.log(
+    "📥 [Home Dashboard] Carregando blocos de faturamento do dia corrente...",
+  );
   const divFaturamento = document.querySelector(".faturamente");
   const divLucro = document.querySelector(".lucro");
   const txtTotalEspetos = document.getElementById("totalEspetosVendidos");
 
-  if (!divFaturamento || !divLucro) return;
+  if (!divFaturamento || !divLucro) {
+    console.warn(
+      "⚠️ [Interface] Blocos visuais da home do painel diário não encontrados.",
+    );
+    return;
+  }
 
   try {
     const hojeInicio = new Date();
     hojeInicio.setHours(0, 0, 0, 0);
 
-    const q = query(collection(db, "vendas"), where("criado_em", ">=", hojeInicio));
+    const q = query(
+      collection(db, "vendas"),
+      where("criado_em", ">=", hojeInicio),
+    );
     const querySnapshot = await getDocs(q);
 
     let fat = 0;
@@ -492,7 +527,9 @@ async function carregarResumosDoDia() {
       fat += v.faturamento_total || 0;
       luc += v.lucro_total || 0;
 
-      const itensSnapshot = await getDocs(collection(db, "vendas", docVenda.id, "itens"));
+      const itensSnapshot = await getDocs(
+        collection(db, "vendas", docVenda.id, "itens"),
+      );
       itensSnapshot.forEach((docItem) => {
         const item = docItem.data();
         totalEspetosHoje += item.quantidade || 0;
@@ -502,20 +539,38 @@ async function carregarResumosDoDia() {
     divFaturamento.innerHTML = `Faturamento<br><strong>R$ ${fat.toFixed(2)}</strong>`;
     divLucro.innerHTML = `Lucro<br><strong>R$ ${luc.toFixed(2)}</strong>`;
 
-    if (txtTotalEspetos) txtTotalEspetos.innerText = `${totalEspetosHoje} Vendidos`;
+    if (txtTotalEspetos) {
+      txtTotalEspetos.innerText = `${totalEspetosHoje} Vendidos`;
+    }
+    console.log(
+      `✅ [Home Dashboard] Atualizada. Faturamento Hoje: R$${fat.toFixed(2)} | Unidades: ${totalEspetosHoje}`,
+    );
   } catch (error) {
-    console.error("❌ [Erro Dashboard Home] Falha ao coletar dados:", error);
+    console.error(
+      "❌ [Erro Dashboard Home] Falha ao coletar dados do painel:",
+      error,
+    );
   }
 }
 
 // ==========================================
-// 9. MONITOR DE ESTOQUE CRÍTICO
+// 8. MONITOR DE ESTOQUE CRÍTICO
 // ==========================================
 async function verificarEstoqueCritico() {
+  console.log(
+    "📥 [Estoque Alerta] Monitorando integridade volumétrica dos espetos...",
+  );
   const containerCritico = document.getElementById("listaEstoqueCritico");
-  const txtTotalProdutosCriticos = document.getElementById("totalProdutosCriticos");
+  const txtTotalProdutosCriticos = document.getElementById(
+    "totalProdutosCriticos",
+  );
 
-  if (!containerCritico) return;
+  if (!containerCritico) {
+    console.warn(
+      "⚠️ [Interface] Container de exibição crítica de estoque indisponível.",
+    );
+    return;
+  }
 
   try {
     const querySnapshot = await getDocs(collection(db, "produtos"));
@@ -534,16 +589,25 @@ async function verificarEstoqueCritico() {
       }
     });
 
-    if (txtTotalProdutosCriticos) txtTotalProdutosCriticos.innerText = `${contadorCriticos} produtos em alerta`;
-    if (contadorCriticos === 0) {
-      containerCritico.innerHTML = "<p style='font-size: 14px; color: #4caf50; opacity: 0.9;'>✅ Tudo certo! Estoques em conformidade.</p>";
+    if (txtTotalProdutosCriticos) {
+      txtTotalProdutosCriticos.innerText = `${contadorCriticos} produtos em alerta`;
     }
+
+    if (contadorCriticos === 0) {
+      containerCritico.innerHTML =
+        "<p style='font-size: 14px; color: #4caf50; opacity: 0.9;'>✅ Tudo certo! Todos os espetos estão com estoque abastecido.</p>";
+    }
+    console.log(
+      `✅ [Estoque Alerta] Varredura completa. Itens em estado crítico: ${contadorCriticos}`,
+    );
   } catch (error) {
-    console.error("❌ [Erro Monitor Estoque] Falha na análise volumétrica:", error);
+    console.error(
+      "❌ [Erro Monitor Estoque] Falha na análise volumétrica:",
+      error,
+    );
   }
 }
 
-// Escuta evento disparado pelo scanner automático
 document.addEventListener("vendaAtualizada", () => {
     console.log("🔄 [Interface] Atualizando dados da tela pós-escaneamento...");
     carregarProdutosNosSelects();
@@ -552,7 +616,7 @@ document.addEventListener("vendaAtualizada", () => {
 });
 
 // ==========================================
-// 10. RECURSO: EDITAR PRODUTOS (CRUD)
+// 9. RECURSO: ALTERAÇÃO DE DADOS DE PRODUTOS (CRUD)
 // ==========================================
 const selectAlterar = document.getElementById("selectAlterarProduto");
 const editNome = document.getElementById("inputAlterarNome");
@@ -564,26 +628,36 @@ const btnSalvarAlteracao = document.getElementById("btnSalvarAlteracaoProduto");
 
 let cacheProdutosLocal = {};
 
-// Função auxiliar para injetar as opções no select de alteração
-async function sincronizarSelectAlterar() {
+const funcaoCarregarOriginal = carregarProdutosNosSelects;
+carregarProdutosNosSelects = async function() {
+    await funcaoCarregarOriginal(); 
+    
     if (!selectAlterar) return;
+    console.log("📥 [CRUD] Atualizando o select de modificação de produtos...");
+    
     try {
         const querySnapshot = await getDocs(collection(db, "produtos"));
         selectAlterar.innerHTML = '<option value="">-- Selecione um produto para editar --</option>';
-        cacheProdutosLocal = {};
+        cacheProdutosLocal = {}; 
+
         querySnapshot.forEach((doc) => {
             const produto = doc.data();
-            cacheProdutosLocal[doc.id] = produto;
-            selectAlterar.innerHTML += `<option value="${doc.id}">${produto.nome}</option>`;
+            const id = doc.id;
+            
+            cacheProdutosLocal[id] = produto;
+            selectAlterar.innerHTML += `<option value="${id}">${produto.nome}</option>`;
         });
+        console.log("✅ [CRUD] Select de edição sincronizado com sucesso.");
     } catch (error) {
-        console.error("❌ [CRUD] Falha ao sincronizar select de alteração:", error);
+        console.error("❌ [CRUD] Falha ao sincronizar catálogo para edição:", error);
     }
-}
+};
 
 if (selectAlterar) {
     selectAlterar.addEventListener("change", (e) => {
         const idSelecionado = e.target.value;
+        console.log(`🔍 [CRUD] Produto selecionado para edição ID: ${idSelecionado}`);
+        
         if (!idSelecionado || !cacheProdutosLocal[idSelecionado]) {
             if(editNome) editNome.value = "";
             if(editCategoria) editCategoria.value = "";
@@ -592,20 +666,24 @@ if (selectAlterar) {
             if(editQrCode) editQrCode.value = "";
             return;
         }
+
         const dadosProduto = cacheProdutosLocal[idSelecionado];
+        
         if(editNome) editNome.value = dadosProduto.nome || "";
         if(editCategoria) editCategoria.value = dadosProduto.categoria || "";
         if(editCusto) editCusto.value = dadosProduto.preco_custo ?? "";
         if(editVenda) editVenda.value = dadosProduto.preco_venda ?? "";
         if(editQrCode) editQrCode.value = dadosProduto.qr_code || "";
+        console.log("📝 [CRUD] Inputs populados com dados atuais do Firestore.");
     });
 }
 
 if (btnSalvarAlteracao) {
     btnSalvarAlteracao.addEventListener("click", async () => {
         const idProduto = selectAlterar.value;
+        
         if (!idProduto) {
-            alert("Por favor, selecione primeiro um produto na lista!");
+            alert("Por favor, selecione primeiro um produto na lista superior!");
             return;
         }
 
@@ -616,12 +694,16 @@ if (btnSalvarAlteracao) {
         const novoQrCode = editQrCode.value.trim();
 
         if (!novoNome || !novaCategoria || isNaN(novoCusto) || isNaN(novoVenda) || !novoQrCode) {
-            alert("Não são permitidos campos em branco ou numéricos inválidos!");
+            alert("Não são permitidos campos em branco ou valores numéricos inválidos!");
             return;
         }
 
+        console.log(`📤 [CRUD] Iniciando persistência de alteração para o documento: ${idProduto}`);
+        
         try {
-            await updateDoc(doc(db, "produtos", idProduto), {
+            const produtoRef = doc(db, "produtos", idProduto);
+            
+            await updateDoc(produtoRef, {
                 nome: novoNome,
                 categoria: novaCategoria,
                 preco_custo: novoCusto,
@@ -629,13 +711,16 @@ if (btnSalvarAlteracao) {
                 qr_code: novoQrCode
             });
 
+            console.log(`✅ [CRUD] Documento ${idProduto} updated com sucesso no Firestore.`);
             alert("Produto alterado com sucesso no sistema!");
+
             carregarProdutosNosSelects();
             carregarResumosDoDia();
             verificarEstoqueCritico();
-            sincronizarSelectAlterar();
+
         } catch (error) {
-            console.error("❌ [CRUD] Erro ao salvar modificações:", error);
+            console.error("❌ [CRUD] Erro crítico ao salvar modificações do produto:", error);
+            alert("Erro de permissão ou rede ao atualizar o produto: " + error.message);
         }
     });
 }
@@ -648,18 +733,15 @@ const selectFuncionario = document.getElementById("func");
 const selectProdutoFunc = document.getElementById("produtoFunc");
 const inputQuantidadeFunc = document.getElementById("quantidade");
 
-// Elementos de Controle de Interface
 const btnModoProdutos = document.getElementById("btnModoProdutos");
 const btnModoTotal = document.getElementById("btnModoTotal");
 const btnFuncDiario = document.getElementById("btnFuncDiario");
 const btnFuncSemanal = document.getElementById("btnFuncSemanal");
 const btnFuncMensal = document.getElementById("btnFuncMensal");
 
-// Variáveis de Estado do Relatório
-let modoRelatorioAtual = "produtos"; // Pode ser "produtos" ou "total"
-let periodoDiasAtual = 0; // Padrão: Diário (0)
+let modoRelatorioAtual = "produtos"; 
+let periodoDiasAtual = 0; 
 
-// Altera o visual dos botões de modo (Produtos vs Total)
 function alternarVisualModos(modoSelecionado) {
     if (!btnModoProdutos || !btnModoTotal) return;
     
@@ -676,7 +758,6 @@ function alternarVisualModos(modoSelecionado) {
     }
 }
 
-// Altera o visual dos botões de período (Diário, Semanal, Mensal)
 function alternarEstiloBotoesFunc(botaoAtivo) {
     const botoes = [btnFuncDiario, btnFuncSemanal, btnFuncMensal];
     botoes.forEach(btn => {
@@ -691,7 +772,6 @@ function alternarEstiloBotoesFunc(botaoAtivo) {
     }
 }
 
-// Ouvintes para alternar os MODOS de exibição do relatório
 if (btnModoProdutos) {
     btnModoProdutos.addEventListener("click", () => {
         modoRelatorioAtual = "produtos";
@@ -708,7 +788,6 @@ if (btnModoTotal) {
     });
 }
 
-// Monitor de cliques para registrar o consumo interno
 if (btnConfirmarInterno && selectFuncionario) {
     btnConfirmarInterno.addEventListener("click", async () => {
         const funcionario = selectFuncionario.value;
@@ -741,7 +820,7 @@ if (btnConfirmarInterno && selectFuncionario) {
                 produtoNome: dadosProduto.nome,
                 idProduto: idProduto,
                 quantidade: quantidade,
-                custoTotal: precoCustoUnitario * quantidade,
+                custoTotal: precoCustoUnitario * quantidade, // Fixado localmente para quantidade
                 dataLancamento: new Date()
             });
 
@@ -758,7 +837,6 @@ if (btnConfirmarInterno && selectFuncionario) {
     });
 }
 
-// Função analítica de Relatório com Duplo Agrupamento (Por Produto ou Busca Total)
 async function carregarRelatorioConsumoFuncionarios(diasParaTratras = 0, botaoAcionado = null) {
     const tabelaBody = document.getElementById("tabelaConsumoFunc");
     const tabelaCabecalho = document.getElementById("cabecalhoTabelaFunc");
@@ -772,7 +850,6 @@ async function carregarRelatorioConsumoFuncionarios(diasParaTratras = 0, botaoAc
         alternarEstiloBotoesFunc(botaoAcionado);
     }
 
-    // Configura o Cabeçalho da Tabela dinamicamente baseado no modo ativo
     if (modoRelatorioAtual === "produtos") {
         tabelaCabecalho.innerHTML = `
             <tr style="border-bottom: 1px solid #444; color: #ff9800; text-align: left;">
@@ -817,7 +894,6 @@ async function carregarRelatorioConsumoFuncionarios(diasParaTratras = 0, botaoAc
             custoGeralPeriodo += data.custoTotal || 0;
         });
 
-        // LÓGICA DE VISÃO 1: Agrupado por Funcionário + Produto
         if (modoRelatorioAtual === "produtos") {
             const agrupado = dadosBrutos.reduce((acc, curr) => {
                 const chave = `${curr.funcionario}_${curr.produtoNome}`;
@@ -845,7 +921,6 @@ async function carregarRelatorioConsumoFuncionarios(diasParaTratras = 0, botaoAc
                 `;
             });
 
-        // LÓGICA DE VISÃO 2: Agrupado apenas por Funcionário (Geral)
         } else {
             const agrupadoTotal = dadosBrutos.reduce((acc, curr) => {
                 const chave = curr.funcionario;
@@ -873,14 +948,6 @@ async function carregarRelatorioConsumoFuncionarios(diasParaTratras = 0, botaoAc
     }
 }
 
-// Ouvintes para os botões de período (Filtros de dias)
 if (btnFuncDiario) btnFuncDiario.addEventListener("click", () => carregarRelatorioConsumoFuncionarios(0, btnFuncDiario));
 if (btnFuncSemanal) btnFuncSemanal.addEventListener("click", () => carregarRelatorioConsumoFuncionarios(7, btnFuncSemanal));
 if (btnFuncMensal) btnFuncMensal.addEventListener("click", () => carregarRelatorioConsumoFuncionarios(30, btnFuncMensal));
-
-// Injeção final necessária para sincronismo do CRUD
-const carregarOriginalModificado = carregarProdutosNosSelects;
-carregarProdutosNosSelects = async function() {
-    await carregarOriginalModificado();
-    await sincronizarSelectAlterar();
-};
