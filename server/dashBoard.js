@@ -145,27 +145,59 @@ async function carregarProdutosNosSelects() {
   const selectVendas = document.getElementById("produto");
   const selectFunc = document.getElementById("produtoFunc");
 
+  // Cria uma lista com os selects que realmente existem na página atual
+  const selectsPresentes = [selectEstoque, selectVendas, selectFunc].filter(el => el !== null);
+  if (selectsPresentes.length === 0) return;
+
   try {
     const querySnapshot = await getDocs(collection(db, "produtos"));
     console.log(
       `📊 [Dados] Total de documentos de produtos recebidos: ${querySnapshot.size}`,
     );
 
-    if (selectEstoque) selectEstoque.innerHTML = '<option value="">Selecione o produto</option>';
-    if (selectVendas) selectVendas.innerHTML = '<option value="">Selecione o produto</option>';
-    if (selectFunc) selectFunc.innerHTML = '<option value="">Selecione o produto</option>';
+    // 1. Criamos um objeto temporário para agrupar os produtos por categoria
+    const produtosAgrupados = {};
 
     querySnapshot.forEach((doc) => {
       const produto = doc.data();
       const idProduto = doc.id;
-      const optionHTML = `<option value="${idProduto}">${produto.nome} (Qtd: ${produto.estoque})</option>`;
+      
+      // Força a categoria a ficar em maiúsculo e remove espaços extras
+      const categoria = (produto.categoria || "GERAL").toUpperCase().trim();
 
-      if (selectEstoque) selectEstoque.innerHTML += optionHTML;
-      if (selectVendas) selectVendas.innerHTML += optionHTML;
-      if (selectFunc) selectFunc.innerHTML += optionHTML;
+      if (!produtosAgrupados[categoria]) {
+        produtosAgrupados[categoria] = [];
+      }
+
+      // Guarda os dados do produto dentro da categoria dele
+      produtosAgrupados[categoria].push({
+        id: idProduto,
+        nome: produto.nome,
+        estoque: produto.estoque !== undefined ? produto.estoque : 0
+      });
+    });
+
+    // 2. CORRIGIDO: Montamos a estrutura do HTML usando a mesma variável (htmlFinal)
+    let htmlFinal = '<option value="">Selecione o produto</option>';
+
+    // Deixa as categorias em ordem alfabética
+    Object.keys(produtosAgrupados).sort().forEach((categoria) => {
+      htmlFinal += `<optgroup label="🔹 ${categoria}">`;
+
+      // Coloca os produtos pertencentes a este grupo
+      produtosAgrupados[categoria].forEach((prod) => {
+        htmlFinal += `<option value="${prod.id}">${prod.nome} (Qtd: ${prod.estoque})</option>`;
+      });
+
+      htmlFinal += `</optgroup>`;
+    });
+
+    // 3. Injeta o HTML formatado apenas nos selects que estão ativos na tela aberta
+    selectsPresentes.forEach((select) => {
+      select.innerHTML = htmlFinal;
     });
     
-    console.log("✅ [Interface] Selects presentes na tela atualizados com sucesso.");
+    console.log("✅ [Interface] Selects presentes na tela atualizados e categorizados com sucesso.");
   } catch (error) {
     console.error(
       "❌ [Erro Firestore] Erro ao buscar produtos para selects: ",
