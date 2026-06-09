@@ -132,6 +132,27 @@ async function processarTransacaoFirebase(codigoLido) {
         const idProduto = docProduto.id;
         const dadosProduto = docProduto.data();
 
+        const estoqueAtual = Number(dadosProduto.estoque) || 0;
+
+        if (estoqueAtual <= 0) {
+            const continuarVenda = confirm(
+            `⚠️ ATENÇÃO: ESTOQUE ZERADO!\n\nO produto [${dadosProduto.nome.toUpperCase()}] está com estoque zerado (Qtd: ${estoqueAtual}).\n\nDeseja continuar com a venda assim mesmo? (O estoque ficará negativo)`
+            );
+
+            // Se o funcionário clicar em "Cancelar" (Não)
+            if (!continuarVenda) {
+                console.log("🚫 [Venda] Operação cancelada pelo usuário devido ao estoque zerado.");
+                
+                if (typeof liberarScannerParaProximaLeitura === "function") {
+                    liberarScannerParaProximaLeitura(); 
+                }
+                return; // Para a execução aqui e NÃO grava no banco
+            }
+            
+            // Se ele clicar em "OK", o código passa batido por aqui e executa as próximas linhas normalmente!
+            console.log("⚠️ [Venda] Funcionário permitiu furar o estoque para o produto: " + dadosProduto.nome);
+        }
+
         alert(`Passo 4: Produto identificado (${dadosProduto.nome || "Sem nome"}). Processando gravação...`);
 
         const precoVenda = Number(dadosProduto.preco_venda) || 0;
