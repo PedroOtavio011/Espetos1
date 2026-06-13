@@ -96,7 +96,7 @@ function onScanSuccess(decodedText, decodedResult) {
     ultimaLeituraTime = agora;
     ultimoCodigoLido = decodedText;
 
-    alert("Passo 1: Leitura detectada: " + decodedText);
+    //alert("Passo 1: Leitura detectada: " + decodedText);
     
     // ⏸️ PAUSA A CÂMERA: Congela a imagem para o sensor parar de bipar enquanto salvamos no banco
     if (html5QrcodeScanner && typeof html5QrcodeScanner.pause === "function") {
@@ -112,7 +112,7 @@ function onScanSuccess(decodedText, decodedResult) {
 }
 // Pipeline de persistência isolado
 async function processarTransacaoFirebase(codigoLido) {
-    alert("Passo 2: Iniciando busca no Firestore...");
+    //alert("Passo 2: Iniciando busca no Firestore...");
     
     try {
         const produtosRef = collection(db, "produtos");
@@ -120,7 +120,7 @@ async function processarTransacaoFirebase(codigoLido) {
         
         const querySnapshot = await getDocs(q);
         
-        alert("Passo 3: Busca respondida. Documentos encontrados: " + querySnapshot.size);
+        //alert("Passo 3: Busca respondida. Documentos encontrados: " + querySnapshot.size);
 
         if (querySnapshot.empty) {
             alert(`X: Código [${codigoLido}] inexistente na coleção 'produtos'.`);
@@ -153,7 +153,7 @@ async function processarTransacaoFirebase(codigoLido) {
             console.log("⚠️ [Venda] Funcionário permitiu furar o estoque para o produto: " + dadosProduto.nome);
         }
 
-        alert(`Passo 4: Produto identificado (${dadosProduto.nome || "Sem nome"}). Processando gravação...`);
+        //alert(`Passo 4: Produto identificado (${dadosProduto.nome || "Sem nome"}). Processando gravação...`);
 
         const precoVenda = Number(dadosProduto.preco_venda) || 0;
         const precoCusto = Number(dadosProduto.preco_custo) || 0;
@@ -179,7 +179,7 @@ async function processarTransacaoFirebase(codigoLido) {
             estoque: increment(-1)
         });
 
-        alert("Passo 5: Sucesso total no Firestore!");
+        alert("Venda do produto [" + (dadosProduto.nome || "Sem nome") + "] registrada com SUCESSO!");
         document.dispatchEvent(new Event("vendaAtualizada"));
 
         // Finalizou com sucesso total? Chama a função que espera o usuário agir e limpa o scanner
